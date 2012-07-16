@@ -1,0 +1,488 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\usepackage{listings}
+\usepackage{proof}
+\usepackage{supertabular}
+\usepackage{geometry}
+\usepackage{color}
+\usepackage{proof}
+\usepackage{theorem}
+
+\newtheorem{lem}{Lemma}
+\newtheorem{thm}{Theorem}
+\newtheorem{defn}{Definition}
+\newtheorem{cor}{Corollary}
+
+\newcommand{\qed}{\hfill \mbox{\raggedright \rule{.07in}{.1in}}}
+
+\newenvironment{proof}{\vspace{1ex}\noindent{\bf Proof}\hspace{0.5em}}
+  {\hfill\qed\vspace{1ex}}
+
+
+\input{tscalc_simple}
+
+\begin{document}
+
+\title{TS0 - A simple linear calculus for typestate inference}
+\author{Iain McGinniss}
+
+\section{Grammar}
+
+\ottgrammartabular{
+\ottt\ottinterrule
+\ottv\ottinterrule
+\otto\ottinterrule
+\ottsv\ottinterrule
+\ottT\ottinterrule
+\ottst\ottinterrule
+\ottO\ottinterrule
+}
+
+\section{Operational Semantics}
+
+\ottgrammartabular{
+\ottmu\ottinterrule
+}
+
+\ottdefnvalidstore
+
+\ottdefnreduce
+
+\section{Type rules}
+
+\ottgrammartabular{
+\ottG\ottinterrule
+\ottT\ottinterrule
+}
+
+\ottdefnvalidgamma
+
+\ottdefnstoretype
+
+\ottdefnmethtype
+
+\ottdefntype
+
+\section{Soundness proofs}
+
+\subsection{Supporting lemmas}
+
+\begin{lem}[Context domains monotonically decrease]
+\label{cdom}
+If $\Gamma \triangleright t : T \triangleleft \Gamma'$, then
+$dom(\Gamma') \subseteq dom(\Gamma)$.
+\end{lem}
+\begin{proof}
+By induction on the typing derivation of $t$. $t$ was typed by one of the
+following rules:
+
+\begin{itemize}
+\item T-UNIT, T-OBJECT or T-FUN-DEF. It follows
+directly from these rules that $\Gamma = \Gamma'$
+therefore $dom(\Gamma') \subseteq dom(\Gamma)$.
+
+\item T-LET, therefore $t = \mathtt{let}\:x\:=\:t'\:\mathtt{in}\:t''$
+for some $t', t'', \Gamma_1, \Gamma_2, T', T''$ such that
+$\Gamma \triangleright t' : T' \triangleleft \Gamma_1$ and
+that $\Gamma_1, x : T' \triangleright t'' : T \triangleleft \Gamma', x : T''$
+where $\Gamma' = \Gamma_2, x : T''$. By induction, we can derive that
+$dom(\Gamma_1) \subseteq dom(\Gamma)$ and that $dom(\Gamma') \subseteq dom(\Gamma_1)$.
+Transitively, $dom(\Gamma') \subseteq dom(\Gamma)$.
+
+\item T-UPDATE, therefore $t = x\::=\:t'$
+for some $t', \Gamma_1, \Gamma_2, T', T''$ such that
+$\Gamma = \Gamma_1, x : T'$,
+$\Gamma' = \Gamma_2, x : T''$
+and that
+$\Gamma_1 \triangleright t' : T'' \triangleleft \Gamma_2$. By induction,
+we have that $dom(\Gamma_2) \subseteq dom(\Gamma_1)$. $\Gamma$ and $\Gamma'$ extend
+these contexts with the same variable $x$, therefore $dom(\Gamma') \subseteq dom(\Gamma)$.
+
+\item T-FUN-CALL, therefore $t = x ( \overline{x_i} )$.
+Directly from T-FUN-CALL, $dom(\Gamma') \subseteq dom(\Gamma)$.
+
+\item T-METH-CALL, therefore $t = x.m$. Directly from T-METH-CALL,
+$dom(\Gamma') \subseteq dom(\Gamma)$.
+
+\item T-SEQ, therefore $t = t' ; t''$ for some $t', t'', \Gamma'', T'$ such that
+$\Gamma \triangleright t' : T' \triangleleft \Gamma''$ and
+$\Gamma'' \triangleright t'' : T \triangleleft \Gamma'$. By induction, we
+have $dom(\Gamma'') \subseteq dom(\Gamma)$ and $dom(\Gamma') \subseteq dom(\Gamma'')$.
+Transitively, $dom(\Gamma') \subseteq dom(\Gamma)$.
+
+\item T-DROP, therefore for some $\Gamma''$ we can also
+type $t$ such that $\Gamma \triangleright t : T \triangleleft \Gamma', \Gamma''$. 
+By induction, $dom(\Gamma' \cup \Gamma'') \subseteq \Gamma$,
+therefore $dom(\Gamma') \subseteq dom(\Gamma)$.
+
+\end{itemize}
+\end{proof}
+
+
+\begin{lem}[Weakening]
+If $\Gamma \triangleright t : T \triangleleft \Gamma'$,
+then for all $\Gamma''$ such that $\mathbf{valid} (\Gamma,\Gamma'')$,
+$t$ can also be typed such that
+$\Gamma, \Gamma'' \triangleright t : T \triangleleft \Gamma', \Gamma''$.
+\end{lem}
+\begin{proof}
+by induction on the structure of $t$.
+
+If $t$ is some value $v$, it follows that the 
+$\Gamma = \Gamma'$ and that the typing derivation will still be valid as long
+as the input and output contexts are identical. Therefore,
+$\Gamma , \Gamma'' \triangleright v : T \triangleleft \Gamma', \Gamma''$.
+
+If $t$ is not a value, then it is of one of the following forms:
+
+\begin{itemize}
+\item $t = \mathtt{let}\:x\:=\:t'\:\mathtt{in}\:t''$. It follows from rule T-LET that
+there exists $\Gamma_1, \Gamma_2, T', T''$ such that
+$\Gamma \triangleright t' : T' \triangleleft \Gamma_1$ and
+$\Gamma_1, x : T \triangleright t'' : T \triangleleft \Gamma', x : T''$.
+By definition, $\mathbf{valid}(\Gamma,\Gamma'')$ implies $dom(\Gamma) \cap dom(\Gamma'') = \emptyset$.
+By Lemma \ref{cdom}, $dom(\Gamma') \subseteq dom(\Gamma_1) \subseteq dom(\Gamma)$.
+Therefore, $\mathbf{valid}(\Gamma_1,\Gamma'')$ and $\mathbf{valid}(\Gamma',\Gamma'')$. 
+By induction, $t'$ can be typed such
+that $\Gamma,\Gamma'' \triangleright t' : T' \triangleleft \Gamma_1,\Gamma''$,
+and $t''$ can be typed such that
+$\Gamma_1, \Gamma'', x : T \triangleright t'' : T \triangleleft \Gamma', \Gamma'', x : T''$,
+as we can assume by Barendregt's convention that $x$ can be made distinct from
+any variable names in $\Gamma''$ by relabeling $x$.
+Therefore,
+$\Gamma, \Gamma'' \triangleright \mathtt{let}\:x\:=\:t'\:\mathtt{in}\:t : T \triangleleft \Gamma', \Gamma''$.
+
+\item $t = x\::=\:t'$. It follows from rule T-UPDATE that
+there exists $\Gamma_1, \Gamma_2, T_1, T'$ such that
+$\Gamma = \Gamma_1, x : T_1$ and that
+$\Gamma' = \Gamma_2, x : T'$, with
+$\Gamma_1 \triangleright t' : T' \triangleleft \Gamma_2$. By Lemma \ref{cdom},
+$dom(\Gamma_2) \subseteq dom(\Gamma)$, therefore $\mathbf{valid}(\Gamma_2,\Gamma'')$ which
+allows by induction for $t'$ to be typed such that
+$\Gamma, \Gamma'' \triangleright t' : T_2 \triangleleft \Gamma_2, \Gamma''$.
+Therefore $\Gamma, \Gamma'' \triangleright x\::=\:t' : T \triangleleft \Gamma', \Gamma''$.
+
+\item $t = x ( \overline{x_i} )$. It follows from the rule T-FUN-CALL that
+there exists a $\Gamma_1$ such that 
+$\Gamma = \Gamma_1, x : (\overline{T_i \gg T_i'}) \rightarrow T, \overline{x_i : T_i}$
+and that 
+$\Gamma' = \Gamma_1, x : (\overline{T_i \gg T_i'}) \rightarrow T, \overline{x_i : T_i'}$.
+As $\Gamma_1$ can be arbitrary in the rule T-FUN-CALL, it follows that we
+can extend the input and output contexts such that
+$\Gamma, \Gamma'' \triangleright x ( \overline{x_i} ) \triangleleft \Gamma', \Gamma''$.
+
+\item $t = x.m$. It follows from the rule T-METH-CALL that there exists
+a $\Gamma_1$ such that $\Gamma = \Gamma_1, x : O@S$ and that $\Gamma' = \Gamma_1, x : O@S'$.
+As $\Gamma_1$ can be arbitrary in rule T-METH-CALL, it follows that we can
+extend the input and out contexts such that
+$\Gamma, \Gamma'' \triangleright x.m : T \triangleleft \Gamma', \Gamma''$.
+
+\item $t = t' ; t''$. It follows from the rule T-SEQ that there exists
+$\Gamma_1$ and $T'$ such that $\Gamma \triangleright t' : T' \triangleleft \Gamma_1$
+and $\Gamma_1 \triangleright t'' : T \triangleleft \Gamma'$. By induction
+$\Gamma, \Gamma'' \triangleright t' : T' \triangleleft \Gamma_1, \Gamma''$
+as $dom(\Gamma_1) \subseteq dom(\Gamma)$ (Lemma \ref{cdom}) and therefore
+$\mathbf{valid}(\Gamma_1,\Gamma'')$.
+Similarly, as $dom(\Gamma_1) = dom(\Gamma')$, by induction
+$\Gamma_1, \Gamma'' \triangleright t'' : T \triangleleft \Gamma', \Gamma''$.
+Therefore $\Gamma, \Gamma'' \triangleright t' : T' \triangleleft \Gamma_1, \Gamma''$.
+\end{itemize}
+
+\end{proof}
+
+\begin{lem}[Substitution]
+If $\Gamma \triangleright t : T \triangleleft \Gamma'$, then
+$\{ \overline{x_i / \rho_i} \} \Gamma \triangleright \{ \overline{x_i / \rho_i} \} t : T \triangleleft \{ \overline{x_i / \rho_i} \} \Gamma'$
+where each $x_i$ and $\rho_i$ is distinct, and $\overline{x_i} \cap \overline{\rho_i} = \emptyset$.
+\end{lem}
+\begin{proof}
+By induction on the structure of $t$.
+
+If $t$ is some value $v$, then $\Gamma = \Gamma'$, therefore
+$\{ \overline{x_i / \rho_i} \} \Gamma = \{ \overline{x_i / \rho_i} \} \Gamma'$
+and substitution has no effect on the value, which has no specific requirements
+of either $\Gamma$ or $\Gamma'$ other than that they are equal.
+Therefore, $\{ \overline{x_i / \rho_i} \} \Gamma \triangleright \{ \overline{x_i / \rho_i} \} v \triangleleft \{ \overline{x_i / \rho_i} \} \Gamma'$.
+
+It $t$ is a term, then it is of one of the following forms:
+
+\begin{itemize}
+\item $t = \mathtt{let}\:x\:=\:t''\:\mathtt{in}\:t'$. 
+Substitution is defined on this term such that
+$\{ \overline{x_i / \rho_i} \} t \equiv \mathtt{let}\:x\:=\:(\{ \overline{x_i / \rho_i} \} t'')\:\mathtt{in}\:(\{ \overline{x_j / \rho_j} \}t')$, where $\overline{\rho_j} = \overline{\rho_i} / \{ x \}$.
+
+By rule T-LET, it follows
+that there exists $T', T'', \Gamma_1$ such that
+$\Gamma \triangleright t'' : T'' \triangleleft \Gamma_1$ and that
+$\Gamma_1, x : T'' \triangleright t'' : T \triangleleft \Gamma', x : T'$.
+Additionally, $x \notin dom(\Gamma)$.
+
+By induction, $t''$ can be substituted such that 
+$\{ \overline{x_i / \rho_i} \} \Gamma \triangleright \{ \overline{x_i / \rho_i} \} t'' \triangleleft \{ \overline{x_i / \rho_i} \} \Gamma_1$.
+Additionally, $t'$ can be substituted such that
+$(\{ \overline{x_j / \rho_j} \} \Gamma_1) , x : T'' \triangleright \{ \overline{x_j / \rho_j} \} t'' \triangleleft \{ (\overline{x_j / \rho_j} \} \Gamma') , x : T'$ as it is guaranteed that $x \notin \overline{\rho_j}$.
+As $dom(\Gamma') \subseteq dom(\Gamma_1) \subseteq dom(\Gamma)$ by Lemma \ref{cdom}, and that $x \notin dom(\Gamma)$, it follows that $\{ \overline{x_i / \rho_i} \} \Gamma_1 = (\{ \overline{x_j / \rho_j} \} \Gamma_1)$ and
+that $\overline{x_i / \rho_i} \} \Gamma' = \overline{x_j / \rho_j} \} \Gamma'$.
+
+Therefore, the requirements of T-LET are satisfied such that
+$\{ \overline{x_i / \rho_i} \} \Gamma \triangleright \{ \overline{x_i / \rho_i} \} t : T \triangleleft \{ \overline{x_i / \rho_i} \} \Gamma'$.
+
+\item $t = \mathtt{x :=\:}t'$. 
+Substitution is defined on this term such that
+$\{ \overline{x_i / \rho_i} \} ( x\::=\:t' ) \equiv \rho\::=\: \{ \overline{x_i / \rho_i} \} t'$
+where $\rho = x$ if $x \notin \overline{\rho_i}$ and $\rho = x_j$ if
+$x = \rho_j$ for some $\rho_j \in \overline{\rho_i}$.
+
+By rule T-UPDATE, there exists
+$T', T'' \Gamma_1, \Gamma_2$ such that
+$\Gamma = \Gamma_1, x : T''$ and $\Gamma' = \Gamma_2, x : T'$ with
+$\Gamma_1 \triangleright t' : T'' \triangleleft \Gamma_2$. 
+
+By induction,
+substitution can be performed on $t'$ such that
+$\{ \overline{x_i / \rho_i} \} \Gamma_1 \triangleright \{ \overline{x_i / \rho_i} \} t' : T'' \triangleleft \{ \overline{x_i / \rho_i} \} \Gamma_2$. 
+
+\begin{itemize}
+\item If $x \in \overline{\rho_i}$,
+$\{ \overline{x_i / \rho_i} \} \Gamma_1, x : T'' \equiv (\{ \overline{x_i / \rho_i} \} \Gamma_1), x_j : T''$
+and
+$\{ \overline{x_i / \rho_i} \} \Gamma_2, x : T' \equiv (\{ \overline{x_i / \rho_i} \} \Gamma_2), x_j : T'$.
+Therefore, $t$ can by typed by T-UPDATE after the substitution.
+\item If $x \notin \overline{\rho_i}$, then
+$\{ \overline{x_i / \rho_i} \} \Gamma_1, x : T'' \equiv (\{ \overline{x_i / \rho_i} \} \Gamma_1), x : T''$
+and
+$\{ \overline{x_i / \rho_i} \} \Gamma_2, x : T' \equiv (\{ \overline{x_i / \rho_i} \} \Gamma_2), x : T'$.
+Therefore, $t$ can be typed by T-UPDATE after the substitution.
+\end{itemize}
+
+\item $t = t_l ; t_r$.
+Substitution is defined on this term such that
+$\{ \overline{x_i / \rho_i} \} ( t_l ; t_r ) \equiv \{ \overline{x_i / \rho_i} \} t_l ; \{ \overline{x_i / \rho_i} \} t_r$.
+
+By rule T-SEQ, there exists $\Gamma'', T'$ such that
+$\Gamma \triangleright t_l : T' \triangleleft \Gamma''$ and
+$\Gamma'' \triangleright t_r : T \triangleleft \Gamma'$. By induction,
+$\{ \overline{x_i / \rho_i} \} \Gamma \triangleright \{ \overline{x_i / \rho_i} \} t_l : T' \triangleleft \{ \overline{x_i / \rho_i} \} \Gamma''$ and
+$\{ \overline{x_i / \rho_i} \} \Gamma'' \triangleright \{ \overline{x_i / \rho_i} \} t_r : T \triangleleft \{ \overline{x_i / \rho_i} \} \Gamma'$.
+Therefore, $t$ can by typed T-SEQ after the substitution.
+
+\item $t = x_0 ( \overline{x_k} )$.
+Substition is defined on this term such that
+$\{ \overline{x_i / \rho_i} \} x_0 ( \overline{x_k} ) \equiv \rho_0 ( \overline{\rho_k} )$
+where for each $x \in \{ x_0, \overline{x_k} \}$,
+$x = \rho_j \implies \rho = x_j$, otherwise $\rho$ is the original value.
+
+For each substitution that occurs in the term, the variable must exist in
+both the input and output contexts by rule T-FUN-CALL, and will be substituted
+for the same name. Therefore, $t$ can be typed by T-FUN-CALL after the
+substitution.
+
+\item $t = x.m$.
+Substition is defined on this term such that
+$\{ \overline{x_i / \rho_i} \} x.m \equiv \rho.m$
+where $\rho = x_j$ if $x = \rho_j$ for some $\rho_j \in \overline{\rho_i}$.
+Otherwise, $\rho = x$.
+
+Rule T-METH-CALL requires that $x$ exist in both $\Gamma$ and $\Gamma'$ and
+therefore any substitution of x in the term will be matched with the
+same substitution in the contexts. Therefore, $t$ can be typed by
+T-METH-CALL after the substitution.
+
+\end{itemize}
+\end{proof}
+
+\subsection{Progress and Preservation}
+
+\begin{thm}[Progress and Preservation]
+Given a term $t$ such that $\Gamma \triangleright t : T \triangleleft \Gamma'$
+with a store $\mu$ such that $\Gamma \vdash \mu$, either $t$ is a value or 
+there exists a $t'$ and $\mu'$ such that
+$t \mid \mu \longrightarrow t' \mid \mu'$, with some $\Gamma''$ such that
+$\Gamma'' \vdash \mu'$ and $\Gamma'' \triangleright t' : T \triangleleft \Gamma'$.
+\end{thm}
+\begin{proof}
+Proof by induction on the structure of $t$. Assume $t$ is not a value. It is
+therefore of one of the following forms:
+
+\begin{itemize}
+\item $t = \mathtt{let}\:x\::=\:t''\:\mathtt{in}\:t'$. 
+It follows by rule T-LET that there exists $\Gamma_1, T', T''$
+such that
+$\Gamma \triangleright t'' : T' \triangleleft \Gamma_1$,
+$\Gamma_1, x : T' \triangleright t' : T \triangleleft \Gamma', x : T''$.
+
+	\begin{itemize}
+	\item If $t''$ is some value $v$, then $\Gamma = \Gamma_1$ and
+	reduction can occur
+	by R-LET-VALUE, such that $\mathtt{let}\:x\::=\:v\:in\:t' \mid \mu \longrightarrow t' \mid \mu [ x \mapsto v ]$.
+	Let $\mu' = \mu [ x \mapsto v ]$. Let $\Gamma'' = \Gamma, x : T'$.
+	It follows that that $\Gamma'' \vdash \mu'$, with
+	$\Gamma'' \triangleright t' : T \triangleleft \Gamma', x : T'$.
+	The requirements of rule T-DROP are satisfied by this, therefore we can 
+	type $t'$ such that $\Gamma'' \triangleright t' : T \triangleleft \Gamma'$.
+
+	\item If $t''$ is a term, 
+	by induction we have that $t'' \mid \mu \longrightarrow t''' \mid \mu'$, with
+	$\Gamma'' \vdash \mu'$ and $\Gamma'' \triangleright t''' : T' \triangleleft \Gamma_1$.
+	This satisfies the requirements of R-LET-TERM, meaning $t$ itself can reduce
+	such that $\mathtt{let}\:x\::=\:t''\:in\:t' \mid \mu \longrightarrow \mathtt{let}\:x\::=\:t'''\:in\:t' \mid \mu'$.
+	Additionally, the conditions of T-LET are satisfied such that
+	$\Gamma'' \triangleright \mathtt{let}\:x\::=\:t'''\:in\:t' : T \triangleleft \Gamma'$.
+
+	\end{itemize}
+
+\item $t = \mathtt{x :=\:}t'$. It follows from rule T-UPDATE that $\Gamma = \Gamma_1, x : T$ 
+and $\Gamma' = \Gamma_2, x : T'$ with $\Gamma_1 \triangleright t' : T' \triangleleft \Gamma_2$,
+and $\Gamma_1, x : T \vdash \mu_1, x \mapsto v$.
+
+	\begin{itemize}
+	\item If $t'$ is some value $v'$, 
+	then reduction can occur by R-UPDATE-VALUE, such that 
+	$x := v' \mid \mu_1, x \mapsto v \longrightarrow unit \mid \mu_1 , x \mapsto v'$.
+	Let $\mu' = \mu_1, x \mapsto v'$. Let $\Gamma'' = \Gamma, x : T'$.
+	It follows that $\Gamma'' \vdash \mu'$. Additionally, as $t'$ was a value,
+	it can be observed that $\Gamma = \Gamma_2$, meaning $\Gamma'' = \Gamma'$
+	and therefore
+	$\Gamma'' \triangleright unit : Unit \triangleleft \Gamma'$ by rule
+	T-UNIT.
+
+	\item If $t'$ is a term, 
+	by induction we have that $t' \mid \mu_1 \longrightarrow t'' \mid \mu_2$
+	with some $\Gamma_3$ such that $\Gamma_3 \vdash \mu_2$ and
+	$\Gamma_3 \triangleright t'' : T' \triangleleft \Gamma_2$.
+	This satisfies the requirements of R-UPDATE-TERM, meaning $t$ itself can reduced
+	such that $x := t' \mid \mu_1, x \mapsto v \longrightarrow x := t'' \mid \mu_2, x \mapsto v$.
+	Let $\mu' = \mu_2, x \mapsto v$. Let $\Gamma''$ = $\Gamma_3, x : T$.
+	It follows that $\Gamma'' \vdash \mu'$. 
+	Additionally, the requirements of T-UPDATE are satisfied such that
+	$\Gamma'' \triangleright x := t'' : Unit \triangleleft \Gamma'$.
+	\end{itemize}
+
+\item $t = t_l ; t_r$. It follows by rule
+T-SEQ that $\Gamma \triangleright t_l : T_l \triangleleft \Gamma_{mid}$ and
+$\Gamma_{mid} \triangleright t_r : T \triangleleft \Gamma'$.
+
+	\begin{itemize}
+	\item If $t_l$ is some value $v$, then
+	reduction can occur by R-SEQ-LEFT-VALUE such that
+	$t_l; t_r \mid \mu \longrightarrow t_r \mu$. Trivially, 
+	$\Gamma'' = \Gamma = \Gamma_{mid}$
+	and $\mu' = \mu$, therefore $\Gamma'' \vdash \mu'$ and 
+	$\Gamma'' \triangleright t_r : T \triangleleft \Gamma'$.
+
+	\item If $t_l$ is a term, by induction $t_l \mid \mu \longrightarrow t_l' \mid \mu'$
+	with some $\Gamma'' \vdash \mu'$ and
+	$\Gamma'' \triangleright t_l' : T_l \triangleleft \Gamma_{mid}$.
+	This satisfies the requirements of R-SEQ-LEFT-TERM
+	such that $t_l; t_r \mid \mu \longrightarrow t_l'; t_r \mid \mu'$.
+	Additionally, the requirements of T-SEQ are satisfied such that
+	$\Gamma'' \triangleright t_l'; t_r : T \triangleleft \Gamma'$.
+
+	\end{itemize}
+
+\item $t = x ( \overline{x_i} )$. It follows by rule T-FUN-CALL that
+$\Gamma = \Gamma_1, x : (\overline{Ti \gg Ti'}) \rightarrow T, \overline{x_i : T_i}$ and that
+$\Gamma' = \Gamma_1, x : (\overline{Ti \gg Ti'}) \rightarrow T, \overline{x_i : T_i'}$.
+As $\Gamma \vdash \mu$, we must have $\mu(x) = \lambda(\overline{\rho_i : T_i \gg T_i'}).t'$
+where $\overline{\rho_i : T_i} \triangleright t : T \triangleleft \overline{\rho_i : T_i'}$.
+Let $t'' = \{ \overline{x_i / \rho_i} \} t' $.
+The term $t$ can be reduced by R-FUN-CALL such that
+$x ( \overline{x_i} ) \mid \mu \longrightarrow t'' \mid \mu$.
+Let $\mu' = \mu$. Let $\Gamma'' = \Gamma$. By the substitution lemma, 
+$\overline{x_i : T_i} \triangleright t'' : T \triangleleft \overline{x_i : T_i'}$.
+By applying the weakening lemma, we can type $t''$ such that
+$\Gamma'' \triangleright t'' : T \triangleleft \Gamma'$,
+with $\Gamma'' \vdash \mu'$.
+
+\item $t = x.m$. It follows by rule T-METH-CALL that
+$\Gamma = \Gamma_1, x : O@S$ and that $\Gamma' = \Gamma_1, x : O@S'$. As
+$\Gamma \vdash \mu$, we must have $\mu = \mu_1, x \mapsto o@S$ where
+$o = [ S \{ m = (v,S') ; ... \} ... ]$ and
+$\Gamma_1 \vdash \mu_1$, with 
+$\emptyset \triangleright v : T \triangleleft \emptyset$.
+Therefore reduction can occur by R-METH-CALL such that
+$x.m \mid \mu_1, x \mapsto o@S \longrightarrow v \mid \mu_1, x \mapsto o@S'$.
+Let $\mu' = \mu_1, x \mapsto o@S'$. Let $\Gamma'' = \Gamma'$. It follows that
+$\Gamma' \vdash \mu'$. Also, as $\Gamma'' = \Gamma'$, it follows by
+one of T-UNIT, T-FUN-DEF or T-OBJECT that 
+$\Gamma'' \triangleright v : T \triangleleft \Gamma'$.
+
+\end{itemize}
+
+Therefore, well-typed terms with a corresponding well-typed store can always be
+reduced, which always produces a new well-typed term with
+corresponding well-typed store.
+
+\end{proof}
+
+\section{Type inference}
+
+\ottgrammartabular{
+\ottC\ottinterrule
+\ottg\ottinterrule
+\otttau\ottinterrule
+\ottphi\ottinterrule
+}
+
+Things we can infer from a typing judgement, assuming it to hold true:
+
+\[
+\begin{array}{lll}
+\llbracket \Gamma \triangleright \mathtt{unit} : \alpha \triangleleft \Gamma' \rrbracket
+& = & 
+\alpha = \mathbf{Unit} \wedge \Gamma = \Gamma' \\
+
+\llbracket \Gamma \triangleright [ \overline{S_i \{ \overline{ m_{ij} = (v_{ij}, S_{ij}) } } \} ]@S : \alpha \triangleleft \Gamma' \rrbracket
+& = & 
+\exists \overline{\alpha_{ij}} .
+\alpha = \{ \overline{ S_i \{ m_{ij} : \alpha_{ij} >> S_{ij} \} }\}@S \wedge
+\overline{\llbracket \Gamma \triangleright v_{ij} : \alpha_{ij} \triangleleft \Gamma \rrbracket}
+\wedge \Gamma = \Gamma' \\
+
+\llbracket \Gamma \triangleright \lambda ( \overline{x_i} ) . t : \alpha \triangleleft \Gamma' \rrbracket
+& = &
+\exists \Gamma_a, \Gamma_b . \exists \overline{\alpha_{ai}, \alpha_{bi}}, \alpha_r . 
+\overline{\Gamma_a(x_i) = \alpha_{ai}} \wedge \overline{\Gamma_b(x_i) = \alpha_{bi}} \\
+&&\wedge\:\alpha = (\overline{\alpha_{ai} \gg \alpha_{bi}}) \rightarrow \alpha_r \wedge \Gamma = \Gamma' \\
+
+\llbracket \Gamma \triangleright \mathtt{let}\:x\:\mathtt{=}\:t'\:\mathtt{in}\:t : \alpha \triangleleft \Gamma' \rrbracket
+& = & 
+\exists \Gamma'', \alpha' . 
+\llbracket \Gamma \triangleright t' : \alpha' \triangleleft \Gamma'' \rrbracket \wedge 
+\Gamma' = \Gamma'', x : \alpha' \wedge
+\alpha = \mathbf{Unit} \\
+
+\llbracket \Gamma \triangleright x\:\mathtt{:=}\:t' : \alpha \triangleleft \Gamma' \rrbracket
+& = &
+\exists \Gamma'', \alpha' . 
+\llbracket \Gamma \triangleright t' : \alpha' \triangleleft \Gamma'' \rrbracket \wedge 
+\Gamma' = \Gamma'' [ x \mapsto \alpha' ] \wedge
+\alpha = \mathbf{Unit} \\
+
+\llbracket \Gamma \triangleright t ; t' : \alpha \triangleleft \Gamma' \rrbracket
+& = &
+\exists \Gamma'', \alpha' . 
+\llbracket \Gamma \triangleright t : \alpha' \triangleleft \Gamma'' \rrbracket \wedge 
+\llbracket \Gamma'' \triangleright t' : \alpha \triangleleft \Gamma' \rrbracket \\
+
+\llbracket \Gamma \triangleright x ( \overline{x_i} ) : \alpha \triangleleft \Gamma' \rrbracket
+& = &
+\exists \overline{\alpha_i}, \overline{\alpha_i'} .
+\overline{\Gamma(x_i) = \alpha_i} \wedge
+\Gamma(x) = ( \overline{\alpha_i \gg \alpha_i'} ) \rightarrow \alpha \wedge
+\Gamma' = \Gamma [ \overline{x_i \mapsto \alpha_i'} ] \\
+
+\llbracket \Gamma \triangleright x.m : \alpha \triangleleft \Gamma' \rrbracket
+& = &
+\exists \omega, \sigma, \sigma' . 
+\Gamma(x) = \omega @ \sigma \wedge
+S.m : \alpha \gg \sigma' \in \omega \wedge
+\Gamma' = \Gamma[ x \mapsto \omega @ \sigma' ] \\
+
+\end{array}
+\]
+
+\end{document}
