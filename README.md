@@ -1,6 +1,5 @@
 # TS0 - A toy language with typestate inference
 
-
 TS0 is a toy language with typestate inference, built and studied as part of
 the PhD Thesis of the author (Iain McGinniss).
 
@@ -12,7 +11,7 @@ file COPYING for details).
 
 ### Package structure
 
-The root package "uk.ac.gla.dcs" is hosted directly under the "scala" source
+The root package "uk.ac.gla.dcs.ts0" is hosted directly under the "scala" source
 directories in both "main" and "test", i.e. there is no directory structure
 uk/ac/gla/dcs as would be the normal Java convention. This is because I find
 such deeply nested directory structures annoying, especially for such a small
