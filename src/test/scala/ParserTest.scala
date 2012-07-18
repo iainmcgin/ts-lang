@@ -23,11 +23,11 @@ class ParserTest extends FunSuite with Parser {
     assert(parseTerm(termStr) === Left(expected))
 
 	test("parse unit value") {
-		checkTerm("unit", UnitValue)
+		checkTerm("unit", UnitValue())
 	}
 
   test("parse zero argument function") {
-    checkTerm("\\().unit", FunValue(Seq(), UnitValue))
+    checkTerm("\\().unit", FunValue(Seq(), UnitValue()))
   }
 
   test("parse multi argument (no types) function") {
@@ -35,7 +35,7 @@ class ParserTest extends FunSuite with Parser {
       "\\(x,y).unit",
       FunValue(
         Seq(ParamDef("x", None), ParamDef("y", None)), 
-        UnitValue
+        UnitValue()
         )
       )
   }
@@ -44,8 +44,8 @@ class ParserTest extends FunSuite with Parser {
     checkTerm(
       "\\(x : Unit >> Unit).unit",
       FunValue(
-        Seq(ParamDef("x", Some(EffectType(UnitType, UnitType)))),
-        UnitValue
+        Seq(ParamDef("x", Some(EffectType(UnitType(), UnitType())))),
+        UnitValue()
         )
       )
   }
@@ -65,8 +65,8 @@ class ParserTest extends FunSuite with Parser {
       "[ A{ a=(unit,B) } B { b=(unit,A) } ]@A",
       ObjValue(
         Seq(
-          StateDef("A", Seq(MethodDef("a", UnitValue, "B"))),
-          StateDef("B", Seq(MethodDef("b", UnitValue, "A")))
+          StateDef("A", Seq(MethodDef("a", UnitValue(), "B"))),
+          StateDef("B", Seq(MethodDef("b", UnitValue(), "A")))
           ),
         "A"
         )
@@ -77,10 +77,10 @@ class ParserTest extends FunSuite with Parser {
     checkTerm(
       "unit; unit; unit",
       Sequence(
-        UnitValue,
+        UnitValue(),
         Sequence(
-          UnitValue,
-          UnitValue
+          UnitValue(),
+          UnitValue()
           )
         )
     )

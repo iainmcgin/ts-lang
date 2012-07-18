@@ -11,7 +11,7 @@
 
 package uk.ac.gla.dcs.ts0
 
-trait Parser extends org.kiama.util.ParserUtilities {
+trait Parser extends org.kiama.util.PositionedParserUtilities {
 
   lazy val term : PackratParser[Term] =
     ("let" ~> ident <~ "=") ~ (term <~ "in") ~ term ^^ LetBind |
@@ -23,7 +23,7 @@ trait Parser extends org.kiama.util.ParserUtilities {
     value
 
   lazy val value : PackratParser[Value] =
-    "unit" ^^ (_ => UnitValue) |
+    "unit" ^^ (_ => UnitValue()) |
     ("[" ~> rep1(statedef) <~ "]" <~ "@") ~ ident ^^ ObjValue |
     ("\\" ~> "(" ~> repsep(paramdef, ",") <~ ")" <~ ".") ~ term ^^ FunValue
 
@@ -42,7 +42,7 @@ trait Parser extends org.kiama.util.ParserUtilities {
   /* type parsers */
 
   lazy val typespec : PackratParser[Type] =
-    "Unit" ^^ (_ => UnitType) |
+    "Unit" ^^ (_ => UnitType()) |
     ("{" ~> rep1(statespec) <~ "}" <~ "@") ~ ident ^^ ObjType |
     ("(" ~> repsep(effectType, ",") <~ "->") ~ typespec ^^ FunType
 

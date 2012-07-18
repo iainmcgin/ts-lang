@@ -1,2 +1,3 @@
 *.sublime-*
 target
+.DS_Store
