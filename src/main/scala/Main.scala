@@ -15,7 +15,6 @@ import org.kiama.util.Console
 import org.kiama.util.Emitter
 import org.kiama.util.Messaging._
 import org.kiama.util.ParsingREPL
-import TypeChecker.check
 
 object Driver extends ParsingREPL[Term] with Parser {
 
@@ -28,16 +27,13 @@ object Driver extends ParsingREPL[Term] with Parser {
 
   override def process(t : Term) {
     resetmessages
-    check(t)
+    TypeChecker.check(t)
 
     if(messagecount > 0) {
       report()
       false
+    } else {
+      println(FullTracePrinter.pretty(t))
     }
-
-    fullTrace(t)
-  }
-
-  def fullTrace(t : Term) {
   }
 }

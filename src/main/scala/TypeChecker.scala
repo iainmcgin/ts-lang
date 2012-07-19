@@ -161,3 +161,88 @@ object TypeChecker {
     t->output
   }
 }
+
+import jline.Terminal
+import jline.TerminalFactory
+
+class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
+
+  import TypeChecker._
+
+  def pretty (t : Term) : String = super.pretty(show(t), term.getWidth())
+
+  def show(t : Term) : Doc = {
+    t match {
+      case UnitValue() => UNIT
+      case ObjValue(states, state) => {
+        val sDocs = states map (showStateDef _)
+        brackets(nest(lsep(sDocs, space))) <> "@" <> state
+      }
+      case FunValue(params, body) => {
+        val pDocs = params map showParams
+        val paramDoc = group("\u30BB" <> parens(ssep(pDocs, ",")))
+
+        paramDoc <> "." <> parens(nest(show(body)))
+      }
+      case LetBind(varName, value, body) => {
+        LET <+> varName <+> "=" <+> nest(show(value)) <+> IN </> show(body)
+      }
+      case Update(varName, body) => varName <+> ":=" <+> nest(show(body))
+      case MethCall(objVarName, methName) => objVarName <> "." <> methName
+      case Sequence(left, right) => show(left) <> ";" </> show(right)
+      case FunCall(funName, paramNames) => 
+        funName <> parens(lsep(paramNames map (text _), ","))
+    }
+  }
+    
+
+  val showParams : ParamDef => Doc = (p => 
+    p.name <> ((p.typeInfo map (space <+> showEffect(_)) getOrElse empty)))
+
+  val showEffect : EffectType => Doc =
+    eff => showType(eff.before) <+> ">>" <+> showType(eff.after)
+
+  def showStateDef(s : StateDef) : Doc = {
+    val mDocs = s.methods map showMethodDef
+    s.name <+> braces(nest(lsep(mDocs, ",")))
+  }
+
+  val showMethodDef : MethodDef => Doc =
+    m => (m.name <+> "=" <+> parens((show (m.ret)) <+> "," </> m.nextState))
+
+  def showType(t : Type) : Doc =
+  t match {
+    case UnitType() => "unit"
+    case FunType(params, ret) => {
+      val pDocs = params map showEffect
+      parens(ssep(pDocs, ",")) <+> "\u2192" <+> showType(ret)
+    }
+    case ErrorType() => "BAD"
+    case ObjType(states, state) => {
+      val sDocs = states map (showStateSpec _)
+      brackets(nest(lsep(sDocs, space))) <> "@" <> state
+    }
+  }
+
+  def showStateSpec(s : StateSpec) = {
+    val mDocs = s.methods map showMethodSpec
+    s.name <+> brackets(nest(lsep(mDocs, ";")))
+  }
+
+  val showMethodSpec : MethodSpec => Doc =
+    (m => m.name <+> ":" <+> showType(m.ret) <+> "\u226B" <+> m.nextState)
+
+  val color : String => String => String =
+    (if(term.isAnsiSupported())
+      ((colorStr:String) => (s:String) => colorStr + s + Console.RESET)
+    else (_ => (s:String) => s))
+  
+  val VALUE : String => String = color(Console.BLUE) 
+  val KEYWORD : String => String = color(Console.MAGENTA)
+
+  val UNIT = text(VALUE("unit"))
+  val LET = text(KEYWORD("let"))
+  val IN = text(KEYWORD("in"))
+}
+
+object FullTracePrinter extends FullTracePrinter(TerminalFactory.create())

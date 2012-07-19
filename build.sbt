@@ -18,7 +18,8 @@ scalacOptions ++= Seq("-deprecation", "-unchecked")
 
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "1.8" % "test",
-  "com.googlecode.kiama" %% "kiama" % "1.3.0"
+  "com.googlecode.kiama" %% "kiama" % "1.3.0",
+  "jline" % "jline" % "2.7"
 )
 
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.8.3")
