@@ -46,7 +46,9 @@ case class ErrorValue() extends Value
 
 /* types */
 
-abstract class Type extends Attributable
+abstract class Type extends Attributable {
+  def >>(outType : Type) = EffectType(this, outType)
+}
 case class UnitType() extends Type
 case class FunType(params : Seq[EffectType], ret : Type) extends Type
 case class ErrorType() extends Type

@@ -50,6 +50,19 @@ class ParserTest extends FunSuite with Parser {
       )
   }
 
+  test("parse function with object type argument") {
+    val objType = 
+      ObjType(Seq(StateSpec("S", Seq(MethodSpec("a", UnitType(), "S")))), "S")
+
+    checkTerm(
+      "\\(x : {S{a : Unit >> S}}@S >> {S{a : Unit >> S}}@S).unit",
+      FunValue(
+        Seq(ParamDef("x", Some(EffectType(objType, objType)))), 
+        UnitValue()
+      )
+    )
+  }
+
   test("parse minimal object value") {
     checkTerm(
       "[S{}]@S",

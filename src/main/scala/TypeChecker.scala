@@ -60,7 +60,15 @@ object TypeChecker {
       case Update(_,_) => UnitType()
       case Sequence(l,r) => r->ttype
       case t @ MethCall(o,m) => 
-        ((t->input)(o)) match { case o @ ObjType(_,_) => o.retType(m) }
+        ((t->input)(o)) match { 
+          case o @ ObjType(_,_) => o.retType(m) 
+          case _ => ErrorType()
+        }
+      case t @ FunCall(name, params) =>
+        ((t->input)(name)) match {
+          case FunType(_,retType) => retType
+          case _ => ErrorType()
+        }
       case ErrorValue() => ErrorType()
     }
 
@@ -78,12 +86,12 @@ object TypeChecker {
     childAttr {
       case t => {
         case FunValue(params,body) => contextFromParams(params)
-        case p @ LetBind(name,value,body) => 
-          (if (t == value) p->input 
+        case p @ LetBind(name,value,body) =>
+          (if (t eq value) p->input 
            else value->output + Pair(p.varName,p.value->ttype))
         case p @ Update(_,_) => p->input
         case p @ Sequence(left, right) => 
-          (if (t == left) p->input else p.left->output)
+          (if (t eq left) p->input else p.left->output)
         case _ => emptyContext
       }
     }
@@ -158,6 +166,7 @@ object TypeChecker {
   }
 
   def check(t : Term) {
+    org.kiama.attribution.Attribution.initTree(t)
     t->output
   }
 }
@@ -169,80 +178,162 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
 
   import TypeChecker._
 
+  override val defaultIndent = 2
+
+  var nextTermId = 0
+
+  val termId : Term => Doc =
+    attr {
+      case _ : Term => {
+        nextTermId += 1
+        TID(nextTermId.toString())
+      }
+    }
+
+  def resetTermIds = {
+    nextTermId = 0
+  }
+
   def pretty (t : Term) : String = super.pretty(show(t), term.getWidth())
 
   def show(t : Term) : Doc = {
-    t match {
-      case UnitValue() => UNIT
+    val tid = t->termId
+    val children = Seq.empty[Doc]
+    val (doc, terms) = t match {
+      case UnitValue() => 
+        Pair(UNIT, Seq.empty)
       case ObjValue(states, state) => {
         val sDocs = states map (showStateDef _)
-        brackets(nest(lsep(sDocs, space))) <> "@" <> state
+        val objBody = nest(lsep(sDocs, space))
+        val objDoc = brackets(objBody <> line) <> "@" <> state
+        val subTerms = states flatMap (_.methods map (_.ret))
+        Pair(objDoc, subTerms)
       }
       case FunValue(params, body) => {
         val pDocs = params map showParams
-        val paramDoc = group("\u30BB" <> parens(ssep(pDocs, ",")))
-
-        paramDoc <> "." <> parens(nest(show(body)))
+        val paramDoc = group("\\" <> parens(ssep(pDocs, ",")))
+        val bodyTermId = body->termId
+        val funDoc = paramDoc <> "." <> parens(bodyTermId)
+        Pair(funDoc, Seq(body))
       }
       case LetBind(varName, value, body) => {
-        LET <+> varName <+> "=" <+> nest(show(value)) <+> IN </> show(body)
+        val valueTermId = value->termId
+        val bodyTermId = body->termId
+        val termDoc = 
+          LET <+> varName <+> "=" <+> valueTermId <+> IN <+> bodyTermId
+        Pair(termDoc, Seq(value, body))
       }
-      case Update(varName, body) => varName <+> ":=" <+> nest(show(body))
-      case MethCall(objVarName, methName) => objVarName <> "." <> methName
-      case Sequence(left, right) => show(left) <> ";" </> show(right)
+      case Update(varName, body) => { 
+        val bodyTermId = body->termId
+        Pair(varName <+> ":=" <+> (bodyTermId), Seq(body))
+      }
+      case MethCall(objVarName, methName) => 
+        Pair(objVarName <> "." <> methName, Seq.empty)
+      case Sequence(left, right) => {
+        val leftTermId = left->termId
+        val rightTermId = right->termId
+        Pair(leftTermId <> ";" </> rightTermId, Seq(left, right))
+      }
+        
       case FunCall(funName, paramNames) => 
-        funName <> parens(lsep(paramNames map (text _), ","))
+        Pair(funName <> parens(lsep(paramNames map (text _), ",")), Seq.empty)
     }
+    val termWithType = doc <+> ":" <+> TYPE(showType(t->ttype))
+    val tidDoc = tid <> ":"
+    val (inContext, outContext) = showContexts(t->input, t->output)
+
+    val docWithContexts = tidDoc <+> group(inContext </> termWithType </> outContext)
+
+    docWithContexts </> nest(lsep(terms.map(show _), " "))
   }
-    
 
   val showParams : ParamDef => Doc = (p => 
-    p.name <> ((p.typeInfo map (space <+> showEffect(_)) getOrElse empty)))
+    p.name <+> ":" <+> 
+      ((p.typeInfo map showEffect) getOrElse empty))
 
   val showEffect : EffectType => Doc =
     eff => showType(eff.before) <+> ">>" <+> showType(eff.after)
 
   def showStateDef(s : StateDef) : Doc = {
     val mDocs = s.methods map showMethodDef
-    s.name <+> braces(nest(lsep(mDocs, ",")))
+    s.name <+> braces(space <> nest(lsep(mDocs, ",")) <> line)
   }
 
-  val showMethodDef : MethodDef => Doc =
-    m => (m.name <+> "=" <+> parens((show (m.ret)) <+> "," </> m.nextState))
+  val showMethodDef : MethodDef => Doc = m => {
+    val tid = m.ret->termId
+    (m.name <+> "=" <+> parens(tid <+> "," </> m.nextState))
+  }
+    
 
   def showType(t : Type) : Doc =
   t match {
-    case UnitType() => "unit"
+    case UnitType() => "Unit"
     case FunType(params, ret) => {
       val pDocs = params map showEffect
-      parens(ssep(pDocs, ",")) <+> "\u2192" <+> showType(ret)
+      parens(ssep(pDocs, ",")) <+> "->" <+> showType(ret)
     }
     case ErrorType() => "BAD"
     case ObjType(states, state) => {
       val sDocs = states map (showStateSpec _)
-      brackets(nest(lsep(sDocs, space))) <> "@" <> state
+      braces(space <> nest(fillsep(sDocs, space)) <> line) <> "@" <> state
     }
   }
 
   def showStateSpec(s : StateSpec) = {
     val mDocs = s.methods map showMethodSpec
-    s.name <+> brackets(nest(lsep(mDocs, ";")))
+    s.name <+> braces(nest(lsep(mDocs, ";")) </> empty)
   }
 
   val showMethodSpec : MethodSpec => Doc =
-    (m => m.name <+> ":" <+> showType(m.ret) <+> "\u226B" <+> m.nextState)
+    (m => m.name <+> ":" <+> showType(m.ret) <+> ">>" <+> m.nextState)
 
-  val color : String => String => String =
+  def showContexts(in : Context, out : Context) : Pair[Doc, Doc] = {
+    val commonVars = in.keySet.intersect(out.keySet)
+    val (unchanged, changed) = commonVars.partition(v => in(v) == out(v))
+
+    val deletedVars = in.filterKeys(in.keySet -- commonVars)
+    val newVars = out.filterKeys(out.keySet -- commonVars)
+    val unchangedVars = in.filterKeys(unchanged)
+    val inChangedVars = in.filterKeys(changed)
+    val outChangedVars = out.filterKeys(changed)
+
+    val valFolder : String => (Seq[Doc],Pair[String,Type]) => Seq[Doc] = 
+      colorStr => (_ :+ showVarMapping(_, colorStr))
+    val docFolder : (String,Map[String,Type]) => Seq[Doc] =
+      (colorStr, doc) => doc.foldLeft(Seq.empty[Doc])(valFolder(colorStr))
+    
+    val unchangedDocs = docFolder(Console.BLACK, unchangedVars)
+    val inChangedDocs = docFolder(Console.YELLOW, inChangedVars)
+    val outChangedDocs = docFolder(Console.YELLOW, outChangedVars)
+
+    val deletedDocs = docFolder(Console.RED, deletedVars)
+    val newDocs = docFolder(Console.GREEN, newVars)
+
+    val docProducer = 
+      (docs : Seq[Doc]) => group(brackets(nest(fillsep(docs, ","))))
+
+    val inDoc = docProducer(unchangedDocs ++ inChangedDocs ++ deletedDocs)
+    val outDoc = docProducer(unchangedDocs ++ outChangedDocs ++ newDocs)
+
+    Pair(inDoc, outDoc)
+  }
+
+  def showVarMapping(p : Pair[String,Type], colorStr : String) : Doc = 
+    color(colorStr)(p._1 <+> ":" <+> showType(p._2))
+
+  val color : String => Doc => Doc =
     (if(term.isAnsiSupported())
-      ((colorStr:String) => (s:String) => colorStr + s + Console.RESET)
-    else (_ => (s:String) => s))
+      ((colorStr:String) => (d:Doc) => colorStr <> d <> Console.RESET)
+    else (_ => (d:Doc) => d))
   
-  val VALUE : String => String = color(Console.BLUE) 
-  val KEYWORD : String => String = color(Console.MAGENTA)
+  val VALUE : String => Doc = color(Console.BLUE)(_)
+  val KEYWORD : String => Doc = color(Console.MAGENTA)(_)
+  val TID : String => Doc = color(Console.BOLD)(_)
+  val TYPE : Doc => Doc = color(Console.CYAN)
 
-  val UNIT = text(VALUE("unit"))
-  val LET = text(KEYWORD("let"))
-  val IN = text(KEYWORD("in"))
+  val UNIT = VALUE("unit")
+  val LET = KEYWORD("let")
+  val IN = KEYWORD("in")
 }
 
 object FullTracePrinter extends FullTracePrinter(TerminalFactory.create())

@@ -26,14 +26,16 @@ object Driver extends ParsingREPL[Term] with Parser {
   override def start = phrase (term)
 
   override def process(t : Term) {
+    FullTracePrinter.resetTermIds
     resetmessages
     TypeChecker.check(t)
 
     if(messagecount > 0) {
       report()
       false
-    } else {
-      println(FullTracePrinter.pretty(t))
     }
+
+    println("full trace for term: ")
+    println(FullTracePrinter.pretty(t))
   }
 }

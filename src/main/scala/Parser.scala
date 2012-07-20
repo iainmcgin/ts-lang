@@ -14,12 +14,12 @@ package uk.ac.gla.dcs.ts0
 trait Parser extends org.kiama.util.PositionedParserUtilities {
 
   lazy val term : PackratParser[Term] =
+    (term <~ ";") ~ term                            ^^ Sequence |
+    "(" ~> term <~ ")" |
     ("let" ~> ident <~ "=") ~ (term <~ "in") ~ term ^^ LetBind |
     (ident <~ ":=") ~ term                          ^^ Update |
     (ident <~ "(") ~ repsep(ident, ",") <~ ")"      ^^ FunCall |
     (ident <~ ".") ~ ident                          ^^ MethCall |
-    (term <~ ";") ~ term                            ^^ Sequence |
-    "(" ~> term <~ ")" |
     value
 
   lazy val value : PackratParser[Value] =
@@ -50,7 +50,7 @@ trait Parser extends org.kiama.util.PositionedParserUtilities {
     (ident <~ "{") ~ rep(methodspec) <~ "}" ^^ StateSpec
 
   lazy val methodspec : PackratParser[MethodSpec] =
-    (ident <~ ":") ~ typespec ~ ident ^^ MethodSpec
+    (ident <~ ":") ~ (typespec <~ ">>") ~ ident ^^ MethodSpec
 
   def ident: Parser[String] =
     """[a-zA-Z_]\w*""".r
