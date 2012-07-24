@@ -18,12 +18,6 @@ import org.kiama.util.Messaging._
 
 object TypeChecker {
 
-  /** A typing context, which consists of variable names mapped to types */
-  type Context = Map[String,Type]
-
-  /** an empty context, which maps all variable names to ErrorType */
-  val emptyContext : Context = Map.empty withDefaultValue ErrorType()
-
   def mSpec(mdef : MethodDef) = 
     MethodSpec(mdef.name, mdef.ret->ttype, mdef.nextState)
 

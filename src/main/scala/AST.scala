@@ -64,6 +64,11 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
     currentState flatMap (s => s.retType(method)) getOrElse ErrorType()
 }
 
+/** represents a type variable, used in type inference. */
+case class Hole(typeVarNum : Int) extends Type
+/** represents an object type of unknown structure, used in type inference */
+case class ObjectHole(objVar : Int, stateVar : Int) extends Type
+
 /* type fragments */
 
 case class StateSpec(name : String, methods : Seq[MethodSpec]) {
