@@ -73,18 +73,20 @@ C :: 'C_' ::=                                      {{ com constraints         }}
 g {{ tex \gamma }} :: 'gc_' ::=                   {{ com context constraints }}
   | ex </ Gi // i /> . C            ::  :: ExGamma      {{ com context existence }}
   | G ( x ) = T                     ::  :: Var          {{ com variable constraint  }}
+  | G = </ xi : ai // i />          ::  :: Explicit     {{ com explicit specification }}
   | G = G'                          ::  :: Equality     {{ com context equality }}
   | G = G' , x : T                  ::  :: Extension    {{ com variable extension }}
   | G = G' [ x |-> T ]              ::  :: Replacement  {{ com variable update }}
+  | G = G' / { x }                  ::  :: Removal      {{ com variable removal }}
 
 tau {{ tex \tau }} :: 't_' ::=                                    {{ com type variable constraints }}
   | ex </ ai // i /> . C      ::  :: ExTy         {{ com type existence     }}
   | a = T                     ::  :: TypeEquality {{ com type equality   }}
 
 phi {{ tex \phi }} :: 'p_' ::=                     {{ com object protocol constraint }}
-  | ex </ wi // i /> . C      ::  :: ExObject      {{ com object protocol existence  }}
-  | ex </ si // i /> . C      ::  :: ExState       {{ com state existence }} 
-  | S . m : T >> S' setin w      ::  :: Method       {{ com method constraint }}
+  | ex </ wi // i /> . C         ::  :: ExObject      {{ com object protocol existence  }}
+  | ex </ si // i /> . C         ::  :: ExState       {{ com state existence }} 
+  | m : T >> s' setin w @ s      ::  :: Method        {{ com method constraint }}
 
 
 terminals :: 'terminals_' ::=

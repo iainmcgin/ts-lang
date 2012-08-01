@@ -18,9 +18,23 @@ package object ts0 {
   type ObjectVar = Int
   type StateVar = Int
 
+  case class TypeVarSupport(typeVar : TypeVar) {
+    def =^=(equivTo : Type) = TypeVarConstraint(typeVar, equivTo)
+    def =^=(otherVar : TypeVar) = TypeVarConstraint(typeVar, Hole(otherVar))
+  }
+  implicit def toTypeVarSupport(typeVar : TypeVar) = TypeVarSupport(typeVar)
+
+  def asSubscript(num : Int) : String = 
+    num.toString.map(c => (c - '0' + 0x2080).toChar)
+
   /** A typing context, which consists of variable names mapped to types */
   type Context = Map[String,Type]
 
   /** an empty context, which maps all variable names to ErrorType */
   val emptyContext : Context = Map.empty.withDefaultValue(ErrorType())
+
+  val unitTy = UnitType()
+  def funTy(ret : Type, params : EffectType*) = FunType(params, ret)
+
+  
 }

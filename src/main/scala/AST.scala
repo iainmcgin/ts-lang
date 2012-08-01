@@ -49,9 +49,17 @@ case class ErrorValue() extends Value
 abstract class Type extends Attributable {
   def >>(outType : Type) = EffectType(this, outType)
 }
-case class UnitType() extends Type
-case class FunType(params : Seq[EffectType], ret : Type) extends Type
+
+case class UnitType() extends Type {
+  override def toString = "Unit"
+}
+
+case class FunType(params : Seq[EffectType], ret : Type) extends Type {
+  override def toString = "(" + params.mkString(",") + ") → " + ret
+}
+
 case class ErrorType() extends Type
+
 case class ObjType(states : Seq[StateSpec], state : String) extends Type {
   val stateMap : Map[String,StateSpec] =
     (states.foldLeft
@@ -62,12 +70,20 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
     
   def retType(method : String) = 
     currentState flatMap (s => s.retType(method)) getOrElse ErrorType()
+
+  override def toString = "{ " + states.mkString(" ") + "}@" + state
 }
 
 /** represents a type variable, used in type inference. */
-case class Hole(typeVarNum : Int) extends Type
+case class Hole(typeVarNum : Int) extends Type {
+  override def toString = "α" + asSubscript(typeVarNum)
+}
+
 /** represents an object type of unknown structure, used in type inference */
-case class ObjectHole(objVar : Int, stateVar : Int) extends Type
+case class ObjectHole(objVar : Int, stateVar : Int) extends Type {
+  override def toString = 
+    "ω" + asSubscript(objVar) + "@" + "σ" + asSubscript(stateVar)
+}
 
 /* type fragments */
 
@@ -85,4 +101,6 @@ case class StateSpec(name : String, methods : Seq[MethodSpec]) {
 
 case class MethodSpec(name : String, ret : Type, nextState : String)
 
-case class EffectType(before : Type, after : Type)
+case class EffectType(before : Type, after : Type) {
+  override def toString = before + " ≫ " + after
+}
