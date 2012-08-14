@@ -37,8 +37,8 @@ class FirstOrderUnificationTest extends FunSuite with ShouldMatchers {
     TempMultiEquation(vars, mtOpt)
   }
 
-  def system(eqs : List[MultiEquation]) =
-    System(List.empty, UPart(eqs.filter(_.counter == 0).toList, eqs.size))
+  def system(eqs : List[MultiEquation], size : Int) =
+    System(List.empty, UPart(eqs.filter(_.counter == 0).toList, size))
 
   test("example page 260") {
     // x0 = f(x1, h(x1), x2) = f(g(x3), x4, x3)
@@ -62,7 +62,7 @@ class FirstOrderUnificationTest extends FunSuite with ShouldMatchers {
     vars(3).m = MultiEquation(1, vset(3), None)
     vars(4).m = MultiEquation(1, vset(4), None)
 
-    val r = system((vars.values.map(_.m)).toList)
+    val r = system((vars.values.map(_.m)).toList, 5)
     
     val solution = Unifier.unify(r)
 
@@ -83,10 +83,6 @@ class FirstOrderUnificationTest extends FunSuite with ShouldMatchers {
   test("example page 262") {
     // x1 = g(x2)
     // x0 = f(x1, h(x1), x2) = f(g(x3), x4, x3)
-    // expected solution:
-    // x1 = g(x3)
-    // x2 = x3
-    // x4 = h(g(x3))
 
     initVars(0 to 4)
 
@@ -99,25 +95,27 @@ class FirstOrderUnificationTest extends FunSuite with ShouldMatchers {
         TempMultiEquation(vset(2,3), None)
       ))
     )
-    vars(1).m = MultiEquation(1, vset(1), Some(g(varsTME(2))))
+    vars(1).m = MultiEquation(2, vset(1), Some(g(varsTME(2))))
     vars(2).m = MultiEquation(2, vset(2), None)
-    vars(3).m = MultiEquation(1, vset(3), None)
+    vars(3).m = MultiEquation(2, vset(3), None)
     vars(4).m = MultiEquation(1, vset(4), None)
 
-    val r = system((vars.values.map(_.m)).toList)
+    val r = system((vars.values.map(_.m)).toList, 5)
 
     println("----------------TEST 2-------------------------")
+    println("input: " + vars.map(p => p._1 + " -> " + p._2.m))
     val solution = Unifier.unify(r)
     println("----------------TEST 2 end---------------------")
 
-    val s1 = MultiEquation(0, vset(1), Some(g(varsTME(3))))
-    val s2 = MultiEquation(0, vset(2, 3), None)
-    val s3 = MultiEquation(0, vset(4), Some(h(tme(vset(), g(tme(vset(3)))))))
+    val expected = Seq(
+      MultiEquation(0, vset(0), Some(f(varsTME(1), varsTME(4), varsTME(2)))),
+      MultiEquation(0, vset(1), Some(g(varsTME(2)))),
+      MultiEquation(0, vset(2, 3), None),
+      MultiEquation(0, vset(4), Some(h(varsTME(1))))
+    )
 
-    solution should have length (4)
-    solution should contain (s1)
-    solution should contain (s2)
-    solution should contain (s3)
+    solution should have length (expected.length)
+    expected.foreach(s => solution should contain (s))
   }
 
   test("example page 268") {
@@ -133,13 +131,13 @@ class FirstOrderUnificationTest extends FunSuite with ShouldMatchers {
       )
     ))
 
-    vars(1).m = MultiEquation(1, vset(1), None)
-    vars(2).m = MultiEquation(1, vset(2), None)
+    vars(1).m = MultiEquation(2, vset(1), None)
+    vars(2).m = MultiEquation(3, vset(2), None)
     vars(3).m = MultiEquation(1, vset(3), None)
-    vars(4).m = MultiEquation(1, vset(4), None)
+    vars(4).m = MultiEquation(2, vset(4), None)
     vars(5).m = MultiEquation(1, vset(5), None)
 
-    var r = system(vars.values.map(_.m).toList)
+    var r = system(vars.values.map(_.m).toList, 6)
 
     println("----------------TEST 3-------------------------")
     val solution = Unifier.unify(r)
@@ -148,21 +146,12 @@ class FirstOrderUnificationTest extends FunSuite with ShouldMatchers {
     val expected = Seq(
       MultiEquation(0, vset(0), 
         Some(f(varsTME(1), varsTME(1), varsTME(2), varsTME(4)))),
-      MultiEquation(0, vset(2), Some(h(tme(vset(), ca), varsTME(4)))),
-      MultiEquation(0, vset(1), Some(
-        g(tme(vset(), h(
-              tme(vset(), ca), 
-              varsTME(3)
-              )
-          ), 
-          varsTME(3))
-        )
-      ),
-      MultiEquation(0, vset(4, 5), Some(cb)),
-      MultiEquation(0, vset(3), Some(h(tme(vset(), ca), tme(vset(), cb))))
+      MultiEquation(0, vset(2, 3), Some(h(tme(vset(), ca), varsTME(4)))),
+      MultiEquation(0, vset(1), Some(g(varsTME(2), varsTME(2)))),
+      MultiEquation(0, vset(4, 5), Some(cb))
     )
 
-    solution should have length (5)
+    solution should have length (expected.length)
     expected foreach (s => solution should contain (s))
   }
 }

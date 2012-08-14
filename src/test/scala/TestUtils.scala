@@ -15,7 +15,10 @@ object TestUtils {
 
   val unitMT = MultiTerm(0, List.empty)
 
-  def v(num : TypeVar) = Variable(num, null)
-  def vset(num : TypeVar*) = Set(num.map(n => v(n)) :_*)
+  def v(tv : TypeVar) = Variable(tv.v, null)
+  def vset(tvs : TypeVar*) = Set(tvs.map(tv => v(tv)) :_*)
+
+  implicit def intToVarTE(i : Int) = VarTE(TypeVar(i))
+  implicit def intToTypeVar(i : Int) = TypeVar(i)
 
 }

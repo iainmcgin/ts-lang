@@ -22,7 +22,27 @@ abstract class Term extends SourceElement
 abstract class Value extends Term
 
 case class UnitValue() extends Value
-case class ObjValue(states : Seq[StateDef], state : String) extends Value
+case class ObjValue(states : Seq[StateDef], state : String) extends Value {
+  val stateMap =
+    (states.foldLeft
+      (Map.empty[String,StateDef])
+      ((m, s) => m + (s.name -> s))
+    )
+
+  def validationErrors : Option[List[MissingState]] = {
+    var errors = List.empty[MissingState]
+    if (!stateMap.contains(state))
+      errors = MissingState(state, this, this) :: errors
+
+    states.flatMap(_.methods).foreach(m => {
+      if (!stateMap.contains(m.nextState)) 
+        errors = MissingState(state, this, m) :: errors
+    })
+
+    if(errors.isEmpty) None else Some(errors)
+  }
+}
+
 case class FunValue(params : Seq[ParamDef], body : Term) extends Value
 
 case class LetBind(varName : String, value : Term, body : Term) extends Term
@@ -44,6 +64,12 @@ case class ParamDef(name : String, typeInfo : Option[EffectType])
 
 case class ErrorValue() extends Value
 
+/* validation errors */
+case class MissingState(
+  state : String, 
+  objValue : ObjValue, 
+  refPoint : SourceElement)
+
 /* types */
 
 abstract class Type extends Attributable {
@@ -52,6 +78,7 @@ abstract class Type extends Attributable {
 
 case class UnitType() extends Type {
   override def toString = "Unit"
+  val label = 1
 }
 
 case class FunType(params : Seq[EffectType], ret : Type) extends Type {
@@ -72,17 +99,6 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
     currentState flatMap (s => s.retType(method)) getOrElse ErrorType()
 
   override def toString = "{ " + states.mkString(" ") + "}@" + state
-}
-
-/** represents a type variable, used in type inference. */
-case class Hole(typeVarNum : Int) extends Type {
-  override def toString = "α" + asSubscript(typeVarNum)
-}
-
-/** represents an object type of unknown structure, used in type inference */
-case class ObjectHole(objVar : Int, stateVar : Int) extends Type {
-  override def toString = 
-    "ω" + asSubscript(objVar) + "@" + "σ" + asSubscript(stateVar)
 }
 
 /* type fragments */

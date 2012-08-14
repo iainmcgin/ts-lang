@@ -19,6 +19,7 @@ import org.scalatest.matchers.ShouldMatchers
 class UnificationProblemBuilderTest extends FunSuite with ShouldMatchers {
 
   import TestUtils._
+  import TypeUtil._
 
   def sanityCheck(eqs : Set[MultiEquation]) = {
     eqs.foreach(meq => { 
@@ -26,7 +27,7 @@ class UnificationProblemBuilderTest extends FunSuite with ShouldMatchers {
     })
   }
 
-  def uniTest(cs : TypeVarConstraint*)(fn : Set[MultiEquation] => Unit) = 
+  def uniTest(cs : TypeExprConstraint*)(fn : Set[MultiEquation] => Unit) = 
     test(cs.mkString(", ")) {
       val (eqs,upart) = 
         UnificationProblemBuilder.buildForTest(cs :_*)
@@ -36,13 +37,13 @@ class UnificationProblemBuilderTest extends FunSuite with ShouldMatchers {
       fn(eqs)
     }
 
-  def badTest(cs : TypeVarConstraint*) = 
+  def badTest(cs : TypeExprConstraint*) = 
     test("bad: " + cs.mkString(", ")) {
       (evaluating { UnificationProblemBuilder.build(cs :_*) } 
         should produce [CannotUnifyMultiTerms])
     }
 
-  uniTest(0 =^= unitTy) 
+  uniTest(0 =^= UnitTE)
   { (eqs) =>
 
     eqs should have size (1)
@@ -50,7 +51,7 @@ class UnificationProblemBuilderTest extends FunSuite with ShouldMatchers {
   }
 
   uniTest(
-    0 =^= unitTy, 
+    0 =^= UnitTE, 
     0 =^= 1) 
   { (eqs) =>
     
@@ -59,8 +60,8 @@ class UnificationProblemBuilderTest extends FunSuite with ShouldMatchers {
   }
 
   uniTest(
-      0 =^= funTy(Hole(4), Hole(2) >> unitTy),
-      1 =^= funTy(Hole(5), unitTy >> Hole(3)),
+      0 =^= funTe(4, 2 >> UnitTE),
+      1 =^= funTe(5, UnitTE >> 3),
       0 =^= 1)
     { (eqs) =>
 
@@ -83,13 +84,13 @@ class UnificationProblemBuilderTest extends FunSuite with ShouldMatchers {
   }
 
   badTest(
-    0 =^= unitTy,
-    1 =^= funTy(unitTy),
+    0 =^= UnitTE,
+    1 =^= funTe(UnitTE),
     0 =^= 1
   )
 
   badTest(
-    0 =^= funTy(Hole(2), Hole(3) >> Hole(4)),
-    0 =^= funTy(Hole(1))
+    0 =^= funTe(2, VarTE(3) >> 4),
+    0 =^= funTe(1)
   )
 }

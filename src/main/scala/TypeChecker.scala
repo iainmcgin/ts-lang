@@ -24,12 +24,22 @@ object TypeChecker {
   def sSpec(sdef : StateDef) = 
     StateSpec(sdef.name, sdef.methods.map(mSpec _))
 
+  def inferFunType(f : FunValue) : FunType = {
+    val constraints = ConstraintGenerator.allConstraints(f)
+    val (inCtx, ty, outCtx) = ConstraintSolver.solve(constraints, f)
+    ty match {
+      case ft @ FunType(params, ret) =>
+        ft
+      case _ => throw new Error("constraint solving returned mismatched type?")
+    }
+  }
+
   // TODO: not implemented at all yet
   def inferredParamEffect(paramName : String) : FunValue => EffectType =
     attr {
       case t : FunValue => {
-        message(t, "Type inference required for this function, not implemented")
-        EffectType(UnitType(), UnitType())
+        val pNum = t.params.indexWhere(_.name == paramName)
+        inferFunType(t).params(pNum)
       }
     }
 
@@ -42,6 +52,20 @@ object TypeChecker {
       }
     }
 
+  val fBodyType : FunValue => Type =
+    attr {
+      case f @ FunValue(params, body) => {
+        if(fullyTypedFunction(f)) body->ttype
+        else {
+          inferFunType(f).ret
+        }
+      }
+    }
+
+  def fullyTypedFunction(f : FunValue) = {
+    f.params.forall(_.typeInfo.isDefined)
+  }
+
   /**
    * Determines the type for a given term.
    */
@@ -49,7 +73,9 @@ object TypeChecker {
     attr {
       case UnitValue() => UnitType()
       case ObjValue(states,state) => ObjType(states.map(sSpec _), state)
-      case FunValue(params,body) => FunType(params.map(_->pEffect), body->ttype)
+      case FunValue(params,body) => 
+
+        FunType(params.map(_->pEffect), body->ttype)
       case LetBind(_,_,_) => UnitType()
       case Update(_,_) => UnitType()
       case Sequence(l,r) => r->ttype

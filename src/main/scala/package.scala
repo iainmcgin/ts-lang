@@ -13,16 +13,13 @@ package uk.ac.gla.dcs
 
 package object ts0 {
 
-  type TypeVar = Int
-  type ContextVar = Int
-  type ObjectVar = Int
-  type StateVar = Int
-
-  case class TypeVarSupport(typeVar : TypeVar) {
-    def =^=(equivTo : Type) = TypeVarConstraint(typeVar, equivTo)
-    def =^=(otherVar : TypeVar) = TypeVarConstraint(typeVar, Hole(otherVar))
+  case class TypeVar(v : Int) {
+    override def toString = "α" + asSubscript(v)
   }
-  implicit def toTypeVarSupport(typeVar : TypeVar) = TypeVarSupport(typeVar)
+
+  case class ContextVar(v : Int) {
+    override def toString = "ɣ" + asSubscript(v)
+  }
 
   def asSubscript(num : Int) : String = 
     num.toString.map(c => (c - '0' + 0x2080).toChar)
@@ -36,5 +33,27 @@ package object ts0 {
   val unitTy = UnitType()
   def funTy(ret : Type, params : EffectType*) = FunType(params, ret)
 
-  
+  def funTe(ret : TypeExpr, params : EffectTE*) = FunTE(params, ret)
+
+  /**
+   * Simple class for allocation of unique variable identifiers.
+   */
+  abstract class Counter[X] {
+    private var last : Int = 0
+    def step() = {
+      last += 1
+      last
+    }
+    def reset() = { last = 0 }
+
+    def next() : X
+  }
+
+  class TypeVarGenerator extends Counter[TypeVar] {
+    def next() = TypeVar(step())
+  }
+
+  class ContextVarGenerator extends Counter[ContextVar] {
+    def next() = ContextVar(step())
+  }
 }

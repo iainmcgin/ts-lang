@@ -44,9 +44,10 @@ case class MultiEquation(
   var m : Option[MultiTerm]) {
 
   def merge(other : MultiEquation) : MultiEquation =
-    if(this eq other) 
+    if(this == other) {
+      println("SAME EQ")
       this
-    else {
+    } else {
       val merged = MultiEquation(
         this.counter + other.counter, 
         this.s ++ other.s, 
@@ -61,7 +62,7 @@ case class MultiEquation(
   }
 
   override def toString =
-    "{" + s.mkString(", ") + "} = " + m.map(_.toString).getOrElse("∅")
+    "[" + counter + "] {" + s.mkString(", ") + "} = " + m.map(_.toString).getOrElse("∅")
 }
 
 case class TempMultiEquation(
@@ -97,9 +98,8 @@ case class Variable(val num : Int, var m : MultiEquation) {
  */
 object Unifier {
 	
-  // DONE
   def unify(r : System) = {
-    while(!r.u.zeroCounterMultEq.isEmpty) {
+    while(r.u.unsolvedCount > 0) {
       val mult = selectMultiEquation(r.u)
       println("unsolved: " + r.u.unsolvedCount)
       println("processing " + mult)
@@ -111,20 +111,20 @@ object Unifier {
       r.t = mult :: r.t
     }
 
+    println("solution: " + r.t)
     r.t
   }
 
-  // DONE
   def selectMultiEquation(u : UPart) : MultiEquation =
     u.zeroCounterMultEq match {
       case Nil => fail("cycle")
       case mult :: mults => {
         u.zeroCounterMultEq = mults
+        u.unsolvedCount -= 1
         mult
       }
     }
 
-  // DONE
   def reduce(m : MultiTerm) : (MultiTerm, List[TempMultiEquation]) = {
     println("reducing " + m)
     val (commonArgs, frontier) = 
@@ -148,7 +148,6 @@ object Unifier {
     Pair(newM, frontier)
   }
 
-  // DONE, potential optimisations / clearer expression possible?
   def compact(frontier : List[TempMultiEquation], u : UPart) = {
     frontier.foreach(tme => {
       println("compacting " + tme)
@@ -159,20 +158,21 @@ object Unifier {
       tme.s.tail.foreach(v => {
         val mult1 = v.m
         mult1.counter -= 1
-        println("merging" + mult + " and " + mult1)
-        mult = mult.merge(mult1)
-        tme.s.head.m = mult
+        println("merge in v" + v.num + " = " + mult1)
+        val merged = mult.merge(mult1)
+        if(!(merged eq mult)) u.unsolvedCount -= 1
+        mult = merged
       })
+
+      tme.s.head.m = mult
 
       mult.m = mult.m.map(_.merge(tme.m)).orElse(tme.m)
       println("merged eq: " + mult)
-      if(mult.counter == 0) {
+      if(mult.counter <= 0) {
         u.zeroCounterMultEq = mult :: u.zeroCounterMultEq
       }
-      u.unsolvedCount -= 1
     })
   }
-  
 
   def fail(reason : String) = throw new IllegalArgumentException(reason)
 }

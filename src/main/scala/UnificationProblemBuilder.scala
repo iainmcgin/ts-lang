@@ -13,14 +13,27 @@ package uk.ac.gla.dcs.ts0
 
 import scala.math.max
 
+object TypeUtil {
+
+  val UNIT_LABEL = 0
+  val FUN_LABEL = 1
+  val OBJ_LABEL = 2
+
+  def labelForType(x : Type) = x match {
+    case _ : UnitType => UNIT_LABEL
+    case _ : FunType => FUN_LABEL
+    case _ : ObjType => OBJ_LABEL
+  }
+}
+
 object UnificationProblemBuilder {
-  def build(varConstraints : TypeVarConstraint*) = {
+  def build(varConstraints : TypeExprConstraint*) = {
     val builder = new UnificationProblemBuilder()
     val eqs = builder.build(varConstraints)
-    builder.buildUPart(eqs)
+    System(List.empty, builder.buildUPart(eqs))
   }
 
-  def buildForTest(varConstraints : TypeVarConstraint*) = {
+  def buildForTest(varConstraints : TypeExprConstraint*) = {
     val builder = new UnificationProblemBuilder()
     val eqs = builder.build(varConstraints)
     val upart = builder.buildUPart(eqs)
@@ -32,11 +45,11 @@ class UnificationProblemBuilder {
 
   private var vars = Map.empty[TypeVar, Variable]
 
-  private def getVarSpec(v : TypeVar) = {
-    if(!vars.contains(v)) {
-      vars = vars.updated(v, Variable(v, null))
+  private def getVarSpec(tv : TypeVar) = {
+    if(!vars.contains(tv)) {
+      vars = vars.updated(tv, Variable(tv.v, null))
     }
-    vars(v)
+    vars(tv)
   }
 
   type EqWithRefs = Pair[MultiEquation,Set[TypeVar]]
@@ -48,16 +61,14 @@ class UnificationProblemBuilder {
     UPart(zeroRefEqs.toList, eqs.size)
   }
 
-  def build(varConstraints : Seq[TypeVarConstraint]) : Set[MultiEquation] = {
+  def build(varConstraints : Seq[TypeExprConstraint]) : Set[MultiEquation] = {
 
     val eqsWithRefsByVariable = (varConstraints.foldLeft
       (Map.empty[TypeVar,EqWithRefs])
       ((m,c) => {
-        val v = c.typeVar
-        val (eq, varsInEq) = m.getOrElse(v, emptyEq(v))
-
-        c.equivTo match {
-          case Hole(otherVar) => {
+        (c.a, c.b) match {
+          case (VarTE(v), VarTE(otherVar)) => {
+            val (eq, varsInEq) = m.getOrElse(v, emptyEq(v))
             val (eq2, varsInEq2) = m.getOrElse(otherVar, emptyEq(otherVar))
             val merged = Pair(eq.merge(eq2), varsInEq ++ varsInEq2)
             val dupReferences = varsInEq intersect varsInEq2
@@ -66,8 +77,9 @@ class UnificationProblemBuilder {
 
             m2 + (v -> merged) + (otherVar -> merged)
           }
-          case ty => {
-            val (multiTerm,varsInMultiTerm) = typeToMultiTerm(ty)
+          case (VarTE(v), te) => {
+            val (eq, varsInEq) = m.getOrElse(v, emptyEq(v))
+            val (multiTerm,varsInMultiTerm) = typeToMultiTerm(te)
             val newEq = MultiEquation(0, Set(getVarSpec(v)), Some(multiTerm))
             val merged = Pair(newEq.merge(eq), varsInMultiTerm ++ varsInEq)
 
@@ -75,11 +87,15 @@ class UnificationProblemBuilder {
             val m2 = fixReferenceCount(newReferences, m, 1)
             m2 + (v -> merged)
           }
+          case (te1, te2) => {
+            // TODO: unsure what to do here yet
+            m
+          }
         }
       })
     )
 
-    vars.values.foreach(v => v.m = eqsWithRefsByVariable(v.num)._1)
+    vars.values.foreach(v => v.m = eqsWithRefsByVariable(TypeVar(v.num))._1)
 
     eqsWithRefsByVariable.values.map(_._1).toSet
   }
@@ -107,25 +123,29 @@ class UnificationProblemBuilder {
       })
     )
 
-  private def typeToMultiTerm(ty : Type) : (MultiTerm,Set[TypeVar]) = {
-    ty match {
-      case UnitType() => Pair(MultiTerm(0, List.empty), Set.empty)
-      case FunType(params, ret) => 
+  private def typeToMultiTerm(te : TypeExpr) : (MultiTerm,Set[TypeVar]) = {
+    te match {
+      case UnitTE => Pair(MultiTerm(TypeUtil.UNIT_LABEL, List.empty), Set.empty)
+      case FunTE(params, ret) => 
         val (retTempEq,retVars) = typeToTempEq(ret)
         val (effectEqs, effectVars) = effectsToTempEqs(params)
         val args = (retTempEq +: effectEqs).reverse
-        Pair(MultiTerm(1, args), retVars ++ effectVars)
-      // TODO
-      case ObjType(_,_) => Pair(MultiTerm(2, List.empty), Set.empty)
+        Pair(MultiTerm(TypeUtil.FUN_LABEL, args), retVars ++ effectVars)
+      case ObjectTE(objVar, stVar) => {
+        val (objVarEq, objVars) = typeToTempEq(VarTE(objVar))
+        val (stVarEq, stVars) = typeToTempEq(VarTE(stVar))
+        val vars = objVars ++ stVars
+        Pair(MultiTerm(TypeUtil.OBJ_LABEL, List(objVarEq, stVarEq)), vars)
+      }
     }
   }
 
-  private def typeToTempEq(ty : Type) : (TempMultiEquation, Set[TypeVar]) = {
-    ty match {
-      case Hole(tv) =>
+  private def typeToTempEq(te : TypeExpr) : (TempMultiEquation, Set[TypeVar]) = {
+    te match {
+      case VarTE(tv) =>
         Pair(TempMultiEquation(Set(getVarSpec(tv)), None), Set(tv))
       case _ => {
-        val (multiTerm,varsInMultiTerm) = typeToMultiTerm(ty)
+        val (multiTerm,varsInMultiTerm) = typeToMultiTerm(te)
         Pair(TempMultiEquation(Set.empty, Some(multiTerm)), varsInMultiTerm)
       }
     }
@@ -135,21 +155,100 @@ class UnificationProblemBuilder {
    * Converts all the effect types into a reversed list of TempMultiEquations,
    * along with the referenced set of type variables.
    */
-  private def effectsToTempEqs(effects : Seq[EffectType]) 
+  private def effectsToTempEqs(effects : Seq[EffectTE]) 
     : (List[TempMultiEquation],Set[TypeVar]) = {
 
     val (effEqs,effVars) = (effects.foldLeft
       (Pair(List.empty[TempMultiEquation],Set.empty[TypeVar]))
       ((p, eff) => {
-        val (beforeTempEq, varsInBefore) = typeToTempEq(eff.before)
-        val (afterTempEq, varsInAfter) = typeToTempEq(eff.after)
+        val (inTempEq, inVars) = typeToTempEq(eff.in)
+        val (outTempEq, outVars) = typeToTempEq(eff.out)
 
-        val eqs = afterTempEq +: beforeTempEq +: p._1
-        val vars : Set[TypeVar] = p._2 ++ varsInBefore ++ varsInAfter
+        val eqs = outTempEq +: inTempEq +: p._1
+        val vars : Set[TypeVar] = p._2 ++ inVars ++ outVars
         Pair(eqs, vars)
       })
     )
     
     (effEqs, effVars)
+  }
+}
+
+case class PolymorphicSolutionException() extends Exception
+
+object SolutionExtractor {
+  def extract(eqs : List[MultiEquation]) : Map[TypeVar, TypeExpr] = {
+    new SolutionExtractor(eqs).buildTypeMap()
+  }
+}
+
+class SolutionExtractor(val eqs : List[MultiEquation]) {
+
+  type EqOrType = Either[MultiEquation,TypeExpr]
+  type VarToEqOrType = Map[TypeVar, EqOrType]
+
+  private var varToEqOrType = 
+    (eqs.foldLeft
+      (Map.empty[TypeVar, EqOrType])
+      ((m, eq) => 
+        (eq.s.foldLeft
+          (m)
+          ((m2, v) => m2.updated(TypeVar(v.num), Left(eq)))
+        )
+      )
+    )
+
+  def buildTypeMap() : Map[TypeVar, TypeExpr] =
+    varToEqOrType.mapValues(_.fold(
+          (eq => eq.m match {
+          case None => throw PolymorphicSolutionException()
+          case Some(mt) => multiTermToType(mt)
+          }),
+          (ty => ty)
+        )
+    )
+
+  private def multiTermToType(mt : MultiTerm) : TypeExpr = {
+    mt.fn match {
+      case TypeUtil.UNIT_LABEL => UnitTE
+      case TypeUtil.FUN_LABEL => {
+        val argTypes = mt.args.map(arg => {
+          if(!arg.s.isEmpty) {
+            varToType(arg.s.head)
+          } else {
+            multiTermToType(arg.m.get)
+          }
+        })
+        
+        val retType = argTypes.last
+        val (effectTypes,_) = 
+          (argTypes.dropRight(1).foldRight
+            (Pair(List.empty[EffectTE], Option.empty[TypeExpr]))
+            ((arg, p) => p._2 match {
+              case None => Pair(p._1, Some(arg))
+              case Some(x) => Pair(EffectTE(x, arg) :: p._1, None)
+            })
+          )
+
+        FunTE(effectTypes, retType)
+      }
+      
+      case TypeUtil.OBJ_LABEL => {
+        // TODO: extract canonical object var and state var
+        // ObjectTE(canObjVar, canStVar)
+        UnitTE
+      }
+    }
+  }
+
+  private def varToType(v : Variable) : TypeExpr = {
+    varToEqOrType(TypeVar(v.num)) match {
+      case Left(meq) => {
+        val ty = multiTermToType(meq.m.get)
+        varToEqOrType = varToEqOrType.updated(TypeVar(v.num), Right(ty))
+        ty
+      }
+      case Right(ty) => ty
+    }
   }
 }
