@@ -15,6 +15,7 @@ import org.kiama._
 import org.kiama.attribution.Attribution._
 import scala.collection.immutable.Map.WithDefault
 import org.kiama.util.Messaging._
+import ObjectValidator._
 
 object TypeChecker {
 
@@ -34,7 +35,6 @@ object TypeChecker {
     }
   }
 
-  // TODO: not implemented at all yet
   def inferredParamEffect(paramName : String) : FunValue => EffectType =
     attr {
       case t : FunValue => {
@@ -72,9 +72,17 @@ object TypeChecker {
   val ttype : Term => Type =
     attr {
       case UnitValue() => UnitType()
-      case ObjValue(states,state) => ObjType(states.map(sSpec _), state)
+      case o @ ObjValue(states,state) => {
+        val objErrors = o->objectErrors
+        if(objErrors.isEmpty) {
+          ObjType(states.map(sSpec _), state)
+        } else {
+          objErrors.foreach(err => 
+            message(err.refPoint, "missing state: " + err.state))
+          ErrorType()
+        }
+      }
       case FunValue(params,body) => 
-
         FunType(params.map(_->pEffect), body->ttype)
       case LetBind(_,_,_) => UnitType()
       case Update(_,_) => UnitType()

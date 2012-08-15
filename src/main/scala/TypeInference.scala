@@ -50,7 +50,7 @@ case class VarTE(typeVar : TypeVar) extends TypeExpr {
 }
 
 case class EffectTE(in : TypeExpr, out : TypeExpr) {
-  override def toString = in + " ≫ "
+  override def toString = in + " ≫ " + out
 }
 
 /* constraints */

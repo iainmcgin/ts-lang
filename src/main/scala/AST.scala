@@ -28,19 +28,6 @@ case class ObjValue(states : Seq[StateDef], state : String) extends Value {
       (Map.empty[String,StateDef])
       ((m, s) => m + (s.name -> s))
     )
-
-  def validationErrors : Option[List[MissingState]] = {
-    var errors = List.empty[MissingState]
-    if (!stateMap.contains(state))
-      errors = MissingState(state, this, this) :: errors
-
-    states.flatMap(_.methods).foreach(m => {
-      if (!stateMap.contains(m.nextState)) 
-        errors = MissingState(state, this, m) :: errors
-    })
-
-    if(errors.isEmpty) None else Some(errors)
-  }
 }
 
 case class FunValue(params : Seq[ParamDef], body : Term) extends Value
