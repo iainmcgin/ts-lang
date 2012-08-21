@@ -26,7 +26,6 @@ case class MultiTerm(fn : Int, var args : List[TempMultiEquation]) {
     case None => this
     case Some(MultiTerm(fn2, args2)) => {
       if (fn != fn2 || args.length != args2.length) {
-        println(this + " != " + m2.get)
         throw CannotUnifyMultiTerms(this, m2.get)
       }
 
@@ -45,7 +44,6 @@ case class MultiEquation(
 
   def merge(other : MultiEquation) : MultiEquation =
     if(this == other) {
-      println("SAME EQ")
       this
     } else {
       val merged = MultiEquation(
@@ -101,8 +99,6 @@ object Unifier {
   def unify(r : System) = {
     while(r.u.unsolvedCount > 0) {
       val mult = selectMultiEquation(r.u)
-      println("unsolved: " + r.u.unsolvedCount)
-      println("processing " + mult)
       if(!mult.m.isEmpty) {
         val (commonPart, frontier) = reduce(mult.m.get)
         mult.m = Some(commonPart)
@@ -111,7 +107,6 @@ object Unifier {
       r.t = mult :: r.t
     }
 
-    println("solution: " + r.t)
     r.t
   }
 
@@ -126,7 +121,6 @@ object Unifier {
     }
 
   def reduce(m : MultiTerm) : (MultiTerm, List[TempMultiEquation]) = {
-    println("reducing " + m)
     val (commonArgs, frontier) = 
       (m.args.foldRight
         (Pair(List.empty[TempMultiEquation], List.empty[TempMultiEquation]))
@@ -142,23 +136,17 @@ object Unifier {
       )
 
     val newM = MultiTerm(m.fn, commonArgs)
-    println("common part: " + newM)
-    println("frontier: " + frontier)
-
     Pair(newM, frontier)
   }
 
   def compact(frontier : List[TempMultiEquation], u : UPart) = {
     frontier.foreach(tme => {
-      println("compacting " + tme)
       var mult = tme.s.head.m
-      println("meq for v" + tme.s.head.num + " is " + mult)
       mult.counter -= 1
 
       tme.s.tail.foreach(v => {
         val mult1 = v.m
         mult1.counter -= 1
-        println("merge in v" + v.num + " = " + mult1)
         val merged = mult.merge(mult1)
         if(!(merged eq mult)) u.unsolvedCount -= 1
         mult = merged
@@ -167,7 +155,6 @@ object Unifier {
       tme.s.head.m = mult
 
       mult.m = mult.m.map(_.merge(tme.m)).orElse(tme.m)
-      println("merged eq: " + mult)
       if(mult.counter <= 0) {
         u.zeroCounterMultEq = mult :: u.zeroCounterMultEq
       }

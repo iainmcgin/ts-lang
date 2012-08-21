@@ -21,4 +21,7 @@ object TestUtils {
   implicit def intToVarTE(i : Int) = VarTE(TypeVar(i))
   implicit def intToTypeVar(i : Int) = TypeVar(i)
 
+  object parse extends Parser {
+    def apply(termStr : String) = parseString(term, termStr)
+  }
 }

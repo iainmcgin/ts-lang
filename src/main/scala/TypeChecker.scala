@@ -25,21 +25,32 @@ object TypeChecker {
   def sSpec(sdef : StateDef) = 
     StateSpec(sdef.name, sdef.methods.map(mSpec _))
 
-  def inferFunType(f : FunValue) : FunType = {
-    val constraints = ConstraintGenerator.allConstraints(f)
-    val (inCtx, ty, outCtx) = ConstraintSolver.solve(constraints, f)
-    ty match {
-      case ft @ FunType(params, ret) =>
-        ft
-      case _ => throw new Error("constraint solving returned mismatched type?")
+  val infer : Term => Option[Tuple3[Context, Type, Context]] =
+    attr {
+      case t => {
+        val constraints = ConstraintGenerator.generateConstraints(t)
+        ConstraintSolver.solve(constraints, t)
+      }
     }
+
+  def inferFunType(f : FunValue) : Option[FunType] = {
+    (f->infer).map(soln => {
+      val (inCtx, ty, outCtx) = soln
+      ty match {
+        case ft @ FunType(params, ret) =>
+          ft
+        case _ => throw new Error("constraint solving returned mismatched type?")
+      }
+    })
   }
 
   def inferredParamEffect(paramName : String) : FunValue => EffectType =
     attr {
       case t : FunValue => {
         val pNum = t.params.indexWhere(_.name == paramName)
-        inferFunType(t).params(pNum)
+        inferFunType(t).map(ft => {
+          ft.params(pNum)
+        }).getOrElse(ErrorType() >> ErrorType())
       }
     }
 
@@ -57,7 +68,7 @@ object TypeChecker {
       case f @ FunValue(params, body) => {
         if(fullyTypedFunction(f)) body->ttype
         else {
-          inferFunType(f).ret
+          inferFunType(f).map(ft => ft.ret).getOrElse(ErrorType())
         }
       }
     }

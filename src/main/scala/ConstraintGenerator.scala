@@ -21,6 +21,8 @@ object ConstraintGenerator {
     ContextRemoval(base, removedVar)
   def addTo(base : ContextVar, varName : String, varType : TypeExpr) = 
     ContextAddition(base, Map(varName -> varType))
+  def update(base : ContextVar, varName : String, varType : TypeExpr) =
+    ModifiedContext(base, Map(varName -> varType))
 
   val typeVars = new TypeVarGenerator()
   val contextVars = new ContextVarGenerator()
@@ -55,9 +57,17 @@ object ConstraintGenerator {
       case _ : StateDef => typeVars.next()
     }
 
-  def allConstraints(t : Term) : ConstraintSet =
+  def generateConstraints(t : Term) : ConstraintSet = {
+    typeVars.reset()
+    contextVars.reset()
+
     (ConstraintSet.empty +
-    ContextConstraint(t->inContextVar, FreeContext(Map.empty)) ++
+    ContextConstraint(t->inContextVar, BaseContext(Map.empty, true)) ++
+    allConstraints(t))
+  }
+    
+
+  def allConstraints(t : Term) : ConstraintSet =
     (t->constraints) ++ 
     (t match {
       case UnitValue() => ConstraintSet.empty
@@ -70,7 +80,7 @@ object ConstraintGenerator {
       case Sequence(left, right) => 
         allConstraints(left) ++ allConstraints(right)
       case FunCall(_,_) => ConstraintSet.empty
-    }))
+    })
 
   def methodConstraints(o : ObjValue) =
     (o.states.foldLeft
@@ -81,12 +91,6 @@ object ConstraintGenerator {
           (cs)
           ((cs, m) => (cs ++
               ((m.ret)->constraints) +
-              MethodConstraint(
-                o->objVar, 
-                sv, 
-                m.name, 
-                VarTE((m.ret)->typeVar), 
-                (o.stateMap(m.nextState))->stateVar) +
               ContextConstraint(
                 (m.ret)->inContextVar, 
                 sameAs(o->inContextVar)) +
@@ -122,9 +126,30 @@ object ConstraintGenerator {
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)) +
       TypeExprConstraint(
         VarTE(t->typeVar), 
-        ObjectTE(t->objVar, t->objInitStateVar))
+        ObjectTE(t->objVar, t->objInitStateVar)) ++
+      allMethodConstraints(t)
     )
   }
+
+  def allMethodConstraints(t : ObjValue) =
+    (t.states.foldLeft
+      (ConstraintSet.empty)
+      ((cs, st) => cs ++ methodConstraints(t, st))
+    )
+
+  def methodConstraints(t : ObjValue, st : StateDef) =
+    (st.methods.foldLeft
+      (ConstraintSet.empty)
+      ((cs, method) => cs + 
+        MethodConstraint(
+          t->objVar,
+          st->stateVar,
+          method.name,
+          VarTE((method.ret)->typeVar),
+          (t.stateMap(method.nextState))->stateVar
+        )
+      )
+    )
 
   def funValueConstraints(t : FunValue) = {
     val inTypeVars = t.params.map(paramToTypeExpr)
@@ -138,10 +163,12 @@ object ConstraintGenerator {
         ((c,p) => 
           c + ContextVarConstraint(t.body->outContextVar, p._1, p._2)))
 
+    println("otcs: " + outTypeConstraints)
+
     outTypeConstraints ++ (ConstraintSet.empty +
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)) +
       ContextConstraint(t.body->inContextVar, 
-        BaseContext(Map(inTypeVars: _*))) +
+        BaseContext(Map(inTypeVars: _*), false)) +
       TypeExprConstraint(VarTE(t->typeVar), funType))
   }
 
@@ -170,6 +197,7 @@ object ConstraintGenerator {
     (ConstraintSet.empty +
       ContextConstraint(t.left->inContextVar, sameAs(t->inContextVar)) +
       ContextConstraint(t.right->inContextVar, sameAs(t.left->outContextVar)) +
+      ContextConstraint(t->outContextVar, sameAs(t.right->outContextVar)) +
       TypeExprConstraint(VarTE(t->typeVar), VarTE(t.right->typeVar))
     )
 

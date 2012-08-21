@@ -63,41 +63,67 @@ class UnificationProblemBuilder {
 
   def build(varConstraints : Seq[TypeExprConstraint]) : Set[MultiEquation] = {
 
-    val eqsWithRefsByVariable = (varConstraints.foldLeft
-      (Map.empty[TypeVar,EqWithRefs])
-      ((m,c) => {
-        (c.a, c.b) match {
+    val (eqsWithRefsByVariable, noVarEqs) = (varConstraints.foldLeft
+      (Pair(Map.empty[TypeVar,EqWithRefs], List.empty[MultiEquation]))
+      ((p,c) => {
+        val m = p._1
+        val l = p._2
+
+        println("processing " + c)
+        val res = (c.a, c.b) match {
           case (VarTE(v), VarTE(otherVar)) => {
             val (eq, varsInEq) = m.getOrElse(v, emptyEq(v))
             val (eq2, varsInEq2) = m.getOrElse(otherVar, emptyEq(otherVar))
             val merged = Pair(eq.merge(eq2), varsInEq ++ varsInEq2)
             val dupReferences = varsInEq intersect varsInEq2
 
+            println("eq = " + merged._1)
+
             val m2 = fixReferenceCount(dupReferences, m, -1)
-
-            m2 + (v -> merged) + (otherVar -> merged)
+            Pair(pointVarsToEq(m2, merged), l)
           }
-          case (VarTE(v), te) => {
-            val (eq, varsInEq) = m.getOrElse(v, emptyEq(v))
-            val (multiTerm,varsInMultiTerm) = typeToMultiTerm(te)
-            val newEq = MultiEquation(0, Set(getVarSpec(v)), Some(multiTerm))
-            val merged = Pair(newEq.merge(eq), varsInMultiTerm ++ varsInEq)
-
-            val newReferences = varsInMultiTerm -- varsInEq
-            val m2 = fixReferenceCount(newReferences, m, 1)
-            m2 + (v -> merged)
-          }
+          case (VarTE(v), te) => Pair(processVarToTypeEquality(m, v, te), l)
+          case (te, VarTE(v)) => Pair(processVarToTypeEquality(m, v, te), l)
           case (te1, te2) => {
-            // TODO: unsure what to do here yet
-            m
+            val (mt1, vmt1) = typeToMultiTerm(te1)
+            val (mt2, vmt2) = typeToMultiTerm(te2)
+            val merged = MultiEquation(0, Set.empty, Some(mt1.merge(Some(mt2))))
+
+            println("eq = " + merged)
+
+            val m2 = fixReferenceCount(vmt1 ++ vmt2, m, 1)
+            
+            Pair(m2, merged :: l)
           }
         }
+
+        println("eqn state: " + (res._1.map(p => (p._1, p._2._1))) + " and " + res._2)
+        res
       })
     )
 
     vars.values.foreach(v => v.m = eqsWithRefsByVariable(TypeVar(v.num))._1)
 
-    eqsWithRefsByVariable.values.map(_._1).toSet
+    val allEqs = eqsWithRefsByVariable.values.map(_._1).toSet ++ noVarEqs
+    println("all eqs: " + allEqs)
+    allEqs
+  }
+
+  private def processVarToTypeEquality(eqsByVar : Map[TypeVar, EqWithRefs],
+    v : TypeVar,
+    te : TypeExpr) : Map[TypeVar, EqWithRefs] = {
+
+    val (eq, varsInEq) = eqsByVar.getOrElse(v, emptyEq(v))
+    val (multiTerm,varsInMultiTerm) = typeToMultiTerm(te)
+    val newEq = MultiEquation(0, Set(getVarSpec(v)), Some(multiTerm))
+    val merged = Pair(newEq.merge(eq), varsInMultiTerm ++ varsInEq)
+
+    println("eq = " + merged._1)
+
+    val newReferences = varsInMultiTerm -- varsInEq
+    val eqsByVar2 = fixReferenceCount(newReferences, eqsByVar, 1)
+
+    pointVarsToEq(eqsByVar2, merged)
   }
 
   private def emptyEq(v : TypeVar) : EqWithRefs = 
@@ -119,8 +145,16 @@ class UnificationProblemBuilder {
           case Some(Pair(MultiEquation(c, s, m),refs)) => 
             Pair(MultiEquation(c + d, s, m), refs)
         }
-        m2.updated(v, newEq)
+        pointVarsToEq(m2, newEq)
       })
+    )
+
+  private def pointVarsToEq(
+    eqsByVar : Map[TypeVar, EqWithRefs], 
+    eq : EqWithRefs) : Map[TypeVar, EqWithRefs] =
+    (eq._1.s.foldLeft
+      (eqsByVar)
+      ((m, v) => m + (TypeVar(v.num) -> eq))
     )
 
   private def typeToMultiTerm(te : TypeExpr) : (MultiTerm,Set[TypeVar]) = {
@@ -137,6 +171,11 @@ class UnificationProblemBuilder {
         val vars = objVars ++ stVars
         Pair(MultiTerm(TypeUtil.OBJ_LABEL, List(objVarEq, stVarEq)), vars)
       }
+      case o : SolvedObjectTE => {
+        throw new IllegalArgumentException("solved object too early: " + o)
+      }
+      case VarTE(_) => 
+        throw new IllegalArgumentException("type variables cannot be multiterms")
     }
   }
 
@@ -201,7 +240,7 @@ class SolutionExtractor(val eqs : List[MultiEquation]) {
   def buildTypeMap() : Map[TypeVar, TypeExpr] =
     varToEqOrType.mapValues(_.fold(
           (eq => eq.m match {
-          case None => throw PolymorphicSolutionException()
+          case None => VarTE(TypeVar(getCanonicalVar(eq).num))
           case Some(mt) => multiTermToType(mt)
           }),
           (ty => ty)
@@ -226,7 +265,7 @@ class SolutionExtractor(val eqs : List[MultiEquation]) {
             (Pair(List.empty[EffectTE], Option.empty[TypeExpr]))
             ((arg, p) => p._2 match {
               case None => Pair(p._1, Some(arg))
-              case Some(x) => Pair(EffectTE(x, arg) :: p._1, None)
+              case Some(x) => Pair(EffectTE(arg, x) :: p._1, None)
             })
           )
 
@@ -234,9 +273,12 @@ class SolutionExtractor(val eqs : List[MultiEquation]) {
       }
       
       case TypeUtil.OBJ_LABEL => {
-        // TODO: extract canonical object var and state var
-        // ObjectTE(canObjVar, canStVar)
-        UnitTE
+        val extractCanonical = (v : Variable) => 
+          TypeVar(getCanonicalVar(v.m).num)
+        val objVar = extractCanonical(mt.args(0).s.head)
+        val stateVar = extractCanonical(mt.args(1).s.head)
+
+        ObjectTE(objVar, stateVar)
       }
     }
   }
@@ -244,11 +286,18 @@ class SolutionExtractor(val eqs : List[MultiEquation]) {
   private def varToType(v : Variable) : TypeExpr = {
     varToEqOrType(TypeVar(v.num)) match {
       case Left(meq) => {
-        val ty = multiTermToType(meq.m.get)
+        val ty = meq.m match {
+          case Some(m) => multiTermToType(m)
+          case None => VarTE(TypeVar(getCanonicalVar(meq).num))
+        }
         varToEqOrType = varToEqOrType.updated(TypeVar(v.num), Right(ty))
         ty
       }
       case Right(ty) => ty
     }
   }
+
+  /** choose the lowest index type variable as the canonical variable */
+  private def getCanonicalVar(meq : MultiEquation) : Variable =
+    meq.s.toList.minBy(_.num)
 }

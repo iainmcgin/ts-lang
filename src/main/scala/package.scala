@@ -27,6 +27,11 @@ package object ts0 {
   /** A typing context, which consists of variable names mapped to types */
   type Context = Map[String,Type]
 
+  /** A typing context, where variables are mapped to type expressions
+   *  rather than concrete types, i.e. type variables may be involved
+   */
+  type PolyContext = Map[String,TypeExpr]
+
   /** an empty context, which maps all variable names to ErrorType */
   val emptyContext : Context = Map.empty.withDefaultValue(ErrorType())
 

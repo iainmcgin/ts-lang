@@ -102,10 +102,7 @@ class FirstOrderUnificationTest extends FunSuite with ShouldMatchers {
 
     val r = system((vars.values.map(_.m)).toList, 5)
 
-    println("----------------TEST 2-------------------------")
-    println("input: " + vars.map(p => p._1 + " -> " + p._2.m))
     val solution = Unifier.unify(r)
-    println("----------------TEST 2 end---------------------")
 
     val expected = Seq(
       MultiEquation(0, vset(0), Some(f(varsTME(1), varsTME(4), varsTME(2)))),
@@ -139,9 +136,7 @@ class FirstOrderUnificationTest extends FunSuite with ShouldMatchers {
 
     var r = system(vars.values.map(_.m).toList, 6)
 
-    println("----------------TEST 3-------------------------")
     val solution = Unifier.unify(r)
-    println("----------------TEST 3 end---------------------")
 
     val expected = Seq(
       MultiEquation(0, vset(0), 

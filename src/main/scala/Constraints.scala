@@ -74,7 +74,7 @@ trait ContextWithDependency extends ContextDefinition {
  */
 case class ModifiedContext(
   base : ContextVar, 
-  changedVars : Map[String,TypeExpr])
+  changedVars : PolyContext)
   extends ContextWithDependency {
 
   override def toString = {
@@ -88,7 +88,7 @@ case class ModifiedContext(
  */
 case class ContextAddition(
   base : ContextVar, 
-  newVars : Map[String,TypeExpr]) 
+  newVars : PolyContext) 
 extends ContextWithDependency {
 
   override def toString = base + ", " + MapUtil.sortedStr(newVars, " : ")
@@ -108,16 +108,11 @@ case class ContextRemoval(base : ContextVar, removedVar : String)
  * Specifies a context explicitly, with all known variable mappings
  * for that context. Used as the input context for a function body.
  */
-case class BaseContext(vars : Map[String,TypeExpr]) extends ContextDefinition {
-  override def toString = "<FIXED>" + MapUtil.sortedStr(vars, " : ")
-}
+case class BaseContext(vars : PolyContext, free : Boolean) 
+  extends ContextDefinition {
 
-/**
- * The input context for a top-level term. Can be arbitrarily extended
- * by discovered free variables.
- */
-case class FreeContext(vars : Map[String,TypeExpr]) extends ContextDefinition {
-  override def toString = "<FREE> " + MapUtil.sortedStr(vars, " : ")
+  override def toString = 
+    (if (free) "<FREE> " else "<FIXED> ") + MapUtil.sortedStr(vars, " : ")
 }
 
 class ConstraintSet(
@@ -137,6 +132,10 @@ class ConstraintSet(
       cvcs ++ others.cvcs,
       tecs ++ others.tecs,
       mcs ++ others.mcs)
+
+  override def toString = {
+    (ccs ++ cvcs ++ tecs ++ mcs).mkString("; ")
+  }
 }
 
 object ConstraintSet {
@@ -150,7 +149,7 @@ object ConstraintSet {
 }
 
 object MapUtil {
-  def sortedStr(changes : Map[String,TypeExpr], pairSep : String) =
+  def sortedStr(changes : PolyContext, pairSep : String) =
     (changes.toList
       .sortBy(_._1)
       .map(p => p._1 + pairSep + p._2)
