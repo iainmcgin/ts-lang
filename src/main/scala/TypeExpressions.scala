@@ -58,15 +58,6 @@ case class EffectTE(in : TypeExpr, out : TypeExpr) {
 object TypeExprUtil {
 
   /**
-   * Determines whether a value of type t1 can be used where a value
-   * of type t2 is expected.
-   */
-  def assignable(t1 : TypeExpr, t2 : TypeExpr) : Boolean = {
-    val equivCheck = TypeExprConstraint(t1, t2)
-    ConstraintSolver.unifyTypes(Seq(equivCheck)).isDefined
-  }
-
-  /**
    * Determines whether t1 and t2 are isomorphic.
    */
   def isomorphic(t1 : TypeExpr, t2 : TypeExpr) : Boolean = 

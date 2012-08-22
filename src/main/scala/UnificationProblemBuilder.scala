@@ -12,6 +12,7 @@
 package uk.ac.gla.dcs.ts0
 
 import scala.math.max
+import grizzled.slf4j.Logger
 
 object TypeUtil {
 
@@ -43,6 +44,8 @@ object UnificationProblemBuilder {
 
 class UnificationProblemBuilder {
 
+  val log = Logger[this.type]
+
   private var vars = Map.empty[TypeVar, Variable]
 
   private def getVarSpec(tv : TypeVar) = {
@@ -69,7 +72,7 @@ class UnificationProblemBuilder {
         val m = p._1
         val l = p._2
 
-        println("processing " + c)
+        log.debug("processing " + c)
         val res = (c.a, c.b) match {
           case (VarTE(v), VarTE(otherVar)) => {
             val (eq, varsInEq) = m.getOrElse(v, emptyEq(v))
@@ -77,7 +80,7 @@ class UnificationProblemBuilder {
             val merged = Pair(eq.merge(eq2), varsInEq ++ varsInEq2)
             val dupReferences = varsInEq intersect varsInEq2
 
-            println("eq = " + merged._1)
+            log.debug("eq = " + merged._1)
 
             val m2 = fixReferenceCount(dupReferences, m, -1)
             Pair(pointVarsToEq(m2, merged), l)
@@ -89,7 +92,7 @@ class UnificationProblemBuilder {
             val (mt2, vmt2) = typeToMultiTerm(te2)
             val merged = MultiEquation(0, Set.empty, Some(mt1.merge(Some(mt2))))
 
-            println("eq = " + merged)
+            log.debug("eq = " + merged)
 
             val m2 = fixReferenceCount(vmt1 ++ vmt2, m, 1)
             
@@ -97,7 +100,7 @@ class UnificationProblemBuilder {
           }
         }
 
-        println("eqn state: " + (res._1.map(p => (p._1, p._2._1))) + " and " + res._2)
+        log.debug("eqn state: " + (res._1.map(p => (p._1, p._2._1))) + " and " + res._2)
         res
       })
     )
@@ -105,7 +108,7 @@ class UnificationProblemBuilder {
     vars.values.foreach(v => v.m = eqsWithRefsByVariable(TypeVar(v.num))._1)
 
     val allEqs = eqsWithRefsByVariable.values.map(_._1).toSet ++ noVarEqs
-    println("all eqs: " + allEqs)
+    log.debug("all eqs: " + allEqs)
     allEqs
   }
 
@@ -118,7 +121,7 @@ class UnificationProblemBuilder {
     val newEq = MultiEquation(0, Set(getVarSpec(v)), Some(multiTerm))
     val merged = Pair(newEq.merge(eq), varsInMultiTerm ++ varsInEq)
 
-    println("eq = " + merged._1)
+    log.debug("eq = " + merged._1)
 
     val newReferences = varsInMultiTerm -- varsInEq
     val eqsByVar2 = fixReferenceCount(newReferences, eqsByVar, 1)

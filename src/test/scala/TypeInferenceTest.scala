@@ -15,8 +15,11 @@ import org.scalatest.FunSuite
 import org.scalatest.matchers.ShouldMatchers
 import org.kiama.util.Messaging._
 import TypeChecker._
+import grizzled.slf4j.Logger
 
 class TypeInferenceTest extends FunSuite with ShouldMatchers {
+
+  val log = Logger[this.type]
 
   def infTest
     (testDesc : String, termStr : String)
@@ -26,11 +29,11 @@ class TypeInferenceTest extends FunSuite with ShouldMatchers {
       TestUtils.parse(termStr) match {
         case Left(t) => {
           org.kiama.attribution.Attribution.initTree(t)
-          println("----")
-          println(termStr)
+          log.debug("----")
+          log.debug(termStr)
           val constraints = ConstraintGenerator.generateConstraints(t)
           val soln = ConstraintSolver.solvePolymorphic(constraints, t)
-          println("----")
+          log.debug("----")
 
           soln match {
             case None => fail("could not infer type of term")

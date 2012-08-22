@@ -13,6 +13,7 @@ package uk.ac.gla.dcs.ts0
 
 import org.kiama._
 import org.kiama.attribution.Attribution._
+import org.kiama.attribution.Attributable
 
 object ConstraintGenerator {
   
@@ -24,27 +25,46 @@ object ConstraintGenerator {
   def update(base : ContextVar, varName : String, varType : TypeExpr) =
     ModifiedContext(base, Map(varName -> varType))
 
-  val typeVars = new TypeVarGenerator()
-  val contextVars = new ContextVarGenerator()
+  val root : Attributable => Attributable =
+    attr {
+      case t : Attributable => if(t.isRoot) t else (t.parent)->root
+    }
+
+  val tvGen : Attributable => TypeVarGenerator =
+    attr {
+      case a : Attributable => 
+        if(a.isRoot) new TypeVarGenerator() else (a->root)->tvGen
+    }
+
+  val cvGen : Attributable => ContextVarGenerator =
+    attr {
+      case a : Attributable => 
+        if(a.isRoot) new ContextVarGenerator() else (a->root)->cvGen
+    }
 
   val typeVar : Term => TypeVar =
     attr {
-      case _ : Term => typeVars.next()
+      case t : Term => (t->tvGen).next()
     }
 
   val inContextVar : Term => ContextVar =
     attr {
-      case _ : Term => contextVars.next()
+      case t : Term  => (t->cvGen).next()
     }
 
   val outContextVar : Term => ContextVar =
     attr {
-      case _ : Term => contextVars.next()
+      case t : Term  => (t->cvGen).next()
     }
 
   val objVar : ObjValue => TypeVar =
     attr {
-      case _ : ObjValue => typeVars.next()
+      case o : ObjValue => (o->tvGen).next()
+    }
+
+  val stateVar : StateDef => TypeVar =
+    attr {
+      case s : StateDef => (s->tvGen).next()
     }
 
   val objInitStateVar : ObjValue => TypeVar =
@@ -52,14 +72,9 @@ object ConstraintGenerator {
       case o : ObjValue => (o.stateMap(o.state))->stateVar
     }
 
-  val stateVar : StateDef => TypeVar =
-    attr {
-      case _ : StateDef => typeVars.next()
-    }
-
   def generateConstraints(t : Term) : ConstraintSet = {
-    typeVars.reset()
-    contextVars.reset()
+    (t->tvGen).reset()
+    (t->cvGen).reset()
 
     (ConstraintSet.empty +
     ContextConstraint(t->inContextVar, BaseContext(Map.empty, true)) ++
@@ -169,8 +184,6 @@ object ConstraintGenerator {
         ((c,p) => 
           c + ContextVarConstraint(t.body->outContextVar, p._1, p._2)))
 
-    println("otcs: " + outTypeConstraints)
-
     outTypeConstraints ++ (ConstraintSet.empty +
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)) +
       ContextConstraint(t.body->inContextVar, 
@@ -209,9 +222,9 @@ object ConstraintGenerator {
 
   def funCallConstraint(t : FunCall) = {
     val paramTypeVars = 
-      t.paramNames.map(p => Tuple3(p, typeVars.next(), typeVars.next()))
+      t.paramNames.map(p => Tuple3(p, (t->tvGen).next(), (t->tvGen).next()))
     val funEffects = paramTypeVars.map(t => EffectTE(VarTE(t._2), VarTE(t._3)))
-    val funRetTypeVar = typeVars.next()
+    val funRetTypeVar = (t->tvGen).next()
     val funType = FunTE(funEffects, VarTE(funRetTypeVar))
 
     val paramConstraints = 
@@ -235,9 +248,9 @@ object ConstraintGenerator {
   }
 
   def methCallConstraint(t : MethCall) = {
-    val objectVar = typeVars.next()
-    val inStateVar = typeVars.next()
-    val outStateVar = typeVars.next()
+    val objectVar = (t->tvGen).next()
+    val inStateVar = (t->tvGen).next()
+    val outStateVar = (t->tvGen).next()
     val inObjectType = ObjectTE(objectVar, inStateVar)
     val outObjectType = ObjectTE(objectVar, outStateVar)
     val methType = VarTE(t->typeVar)
@@ -253,6 +266,6 @@ object ConstraintGenerator {
   def buildEffects(in : Seq[(String,TypeExpr)], out : Seq[(String,TypeExpr)]) =
     in.zip(out).map(x => EffectTE(x._1._2, x._2._2))
 
-  val paramToTypeExpr = (pdef : ParamDef) => Pair(pdef.name, VarTE(typeVars.next()))
-
+  val paramToTypeExpr = 
+    (pdef : ParamDef) => Pair(pdef.name, VarTE((pdef->tvGen).next()))
 }

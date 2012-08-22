@@ -25,16 +25,29 @@ case class CannotUnifyTypes(t1 : Type, t2 : Type) extends Exception
 
 object ConstraintSolver {
 
+  def solve(constraints : ConstraintSet, t : Term) = {
+    new ConstraintSolver(t).solve(constraints)
+  }
+
+  def solvePolymorphic(constraints : ConstraintSet, t : Term) = {
+    new ConstraintSolver(t).solvePolymorphic(constraints)
+  }
+}
+
+class ConstraintSolver(t : Term) {
+
+  import ConstraintGenerator.tvGen
+  import ConstraintGenerator.cvGen
   import ConstraintGenerator.typeVar
   import ConstraintGenerator.inContextVar
   import ConstraintGenerator.outContextVar
 
   val log = Logger[this.type]
 
-  def solve(constraints : ConstraintSet, t : Term) 
+  def solve(constraints : ConstraintSet) 
     : Option[Tuple3[Context, Type, Context]] = {
     
-    val polySolution = solvePolymorphic(constraints, t)
+    val polySolution = solvePolymorphic(constraints)
 
     polySolution.map(soln => {
       val (inCtx, freeTypeVars, termTe, outCtx) = soln
@@ -54,22 +67,22 @@ object ConstraintSolver {
     })
   }
 
-  def solvePolymorphic(constraints : ConstraintSet, t : Term) 
+  def solvePolymorphic(constraints : ConstraintSet)
     : Option[Tuple4[PolyContext,Set[TypeVar],TypeExpr,PolyContext]] = {
 
-    println("t: " + t)
-    println("constraints: " + constraints)
+    log.debug("solving constraints for " + t)
+    log.debug("constraints: " + constraints)
     val contexts = expandContexts(constraints.ccs, constraints.cvcs)
-    println("ctx: " + contexts)
+    log.debug("expanded contexts: " + contexts)
     val extraTypeConstraints = matchTypes(contexts, constraints.cvcs)
     val allTypeConstraints = constraints.tecs ++ extraTypeConstraints
-    println("tcs: " + allTypeConstraints)
+    log.debug("derived type constraints: " + allTypeConstraints)
     val varsToTypeExprsOpt = unifyTypes(allTypeConstraints)
     
     varsToTypeExprsOpt.map(varsToTypeExprs => {
-      println("soln: " + varsToTypeExprs)
+      log.debug("type constraints solution: " + varsToTypeExprs)
       val objects = solveMethodConstraints(constraints.mcs, varsToTypeExprs)
-      println("objects: " + objects)
+      log.debug("inferred object types: " + objects)
       val contextConverter = ((cv : ContextVar) =>
         contexts(cv).mapValues(te => 
           eliminateVariables(te, varsToTypeExprs, objects)._2)
@@ -77,7 +90,6 @@ object ConstraintSolver {
       val inCtx = contextConverter(t->inContextVar)
       val outCtx = contextConverter(t->outContextVar)
 
-      println("te: " + varsToTypeExprs(t->typeVar))
       val (free, termTe) = 
         eliminateVariables(
           varsToTypeExprs(t->typeVar), 
@@ -228,7 +240,7 @@ object ConstraintSolver {
         // FIXME: type variable needs to be fresh!
         val ctxs = checkForFreeVariable(
           removedVar, 
-          VarTE(TypeVar(0)), 
+          VarTE((t->tvGen).next()), 
           spec.base, 
           contexts, 
           transRoots)
@@ -332,11 +344,11 @@ object ConstraintSolver {
     val sys = UnificationProblemBuilder.build(constraints :_*)
     try {
       val solvedEqs : List[MultiEquation] = Unifier.unify(sys)
-      println("solvedEqs: " + solvedEqs)
+      log.debug("solvedEqs: " + solvedEqs)
       Some(SolutionExtractor.extract(solvedEqs))
     } catch {
       case e => {
-        println("solution failed: " + e)
+        log.debug("solution failed: " + e)
         None
       }
     }

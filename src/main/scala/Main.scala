@@ -16,11 +16,26 @@ import org.kiama.util.Emitter
 import org.kiama.util.Messaging._
 import org.kiama.util.ParsingREPL
 
+import org.slf4j.LoggerFactory
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import org.slf4j.{Logger => SLF4JLogger}
+
+
 object Driver extends ParsingREPL[Term] with Parser {
 
   override def main(args : Array[String]) {
+    if(!args.contains("-debug")) {
+      disableLogging()
+    }
     println("TS0 REPL - press CTRL+D to exit. Type single-line terms for type analysis")
     super.main(args)
+  }
+
+  def disableLogging() {
+    val root = 
+      LoggerFactory.getLogger(SLF4JLogger.ROOT_LOGGER_NAME).asInstanceOf[Logger]
+    root.setLevel(Level.OFF)
   }
 
   override def start = phrase (term)
