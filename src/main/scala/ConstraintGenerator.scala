@@ -125,31 +125,37 @@ object ConstraintGenerator {
     (ConstraintSet.empty +
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)) +
       TypeExprConstraint(
-        VarTE(t->typeVar), 
-        ObjectTE(t->objVar, t->objInitStateVar)) ++
-      allMethodConstraints(t)
+        VarTE(t->typeVar), createSolvedObject(t))
     )
   }
 
-  def allMethodConstraints(t : ObjValue) =
-    (t.states.foldLeft
-      (ConstraintSet.empty)
-      ((cs, st) => cs ++ methodConstraints(t, st))
-    )
-
-  def methodConstraints(t : ObjValue, st : StateDef) =
-    (st.methods.foldLeft
-      (ConstraintSet.empty)
-      ((cs, method) => cs + 
-        MethodConstraint(
-          t->objVar,
-          st->stateVar,
-          method.name,
-          VarTE((method.ret)->typeVar),
-          (t.stateMap(method.nextState))->stateVar
-        )
+  def createSolvedObject(o : ObjValue) = {
+    val stateMap = 
+      (o.states.foldLeft
+        (Map.empty[String,StateDef])
+        ((m, s) => m + (s.name -> s))
       )
+
+    val getStateVar = ((name : String) => 
+      stateMap.get(name).map(state => state->stateVar).getOrElse {
+      throw new IllegalArgumentException(
+            "state " + name + "missing")
+    })
+
+    SolvedObjectTE(
+      o->objVar,
+      o.states.map(state => {
+        StateTE(state->stateVar, state.methods.map(m => {
+          MethodTE(
+            m.name, 
+            VarTE((m.ret)->typeVar), 
+            getStateVar(m.nextState)
+          )
+        }))
+      }),
+      o->objInitStateVar
     )
+  }
 
   def funValueConstraints(t : FunValue) = {
     val inTypeVars = t.params.map(paramToTypeExpr)

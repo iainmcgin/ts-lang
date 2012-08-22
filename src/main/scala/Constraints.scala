@@ -134,7 +134,9 @@ class ConstraintSet(
       mcs ++ others.mcs)
 
   override def toString = {
-    (ccs ++ cvcs ++ tecs ++ mcs).mkString("; ")
+    val sortedCcs = ccs.sortBy(_.context.v)
+
+    (sortedCcs ++ cvcs ++ tecs ++ mcs).mkString("; ")
   }
 }
 

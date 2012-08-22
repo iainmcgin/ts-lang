@@ -29,6 +29,7 @@ case class ObjectTE(objVar : TypeVar, stateVar : TypeVar) extends TypeExpr {
 }
 
 case class SolvedObjectTE(
+  objVar : TypeVar,
   states : Seq[StateTE], 
   state : TypeVar) 
   extends TypeExpr {
@@ -97,10 +98,11 @@ object TypeExprUtil {
 
         (ovIso && osIso, ev3)
       }
-      case (SolvedObjectTE(o1, s1), SolvedObjectTE(o2, s2)) => {
+      case (SolvedObjectTE(o1, ss1, s1), SolvedObjectTE(o2, ss2, s2)) => {
         val (sIso, ev2) = varsEquivalent(s1, s2, equivVars)
-        val (oIso, ev3) = objectsIsomorphic(o1, o2, ev2)
-        (sIso && oIso, ev3)
+        val (oIso, ev3) = varsEquivalent(o1, o2, equivVars)
+        val (obIso, ev4) = statesIsomorphic(ss1, ss2, ev3)
+        (sIso && oIso && obIso, ev4)
       }
       case other => (false, equivVars)
     }
@@ -158,7 +160,7 @@ object TypeExprUtil {
     }
   }
 
-  private def objectsIsomorphic(
+  private def statesIsomorphic(
     o1 : Seq[StateTE], 
     o2 : Seq[StateTE],
     equivVars : TVEquivalence)

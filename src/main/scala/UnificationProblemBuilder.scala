@@ -171,8 +171,11 @@ class UnificationProblemBuilder {
         val vars = objVars ++ stVars
         Pair(MultiTerm(TypeUtil.OBJ_LABEL, List(objVarEq, stVarEq)), vars)
       }
-      case o : SolvedObjectTE => {
-        throw new IllegalArgumentException("solved object too early: " + o)
+      case SolvedObjectTE(objVar, states, stateVar) => {
+        val (objVarEq, objVars) = typeToTempEq(VarTE(objVar))
+        val (stVarEq, stVars) = typeToTempEq(VarTE(stateVar))
+        val vars = objVars ++ stVars
+        Pair(MultiTerm(TypeUtil.OBJ_LABEL, List(objVarEq, stVarEq)), vars)
       }
       case VarTE(_) => 
         throw new IllegalArgumentException("type variables cannot be multiterms")

@@ -59,7 +59,7 @@ object ConstraintSolver {
 
     println("t: " + t)
     println("constraints: " + constraints)
-    val contexts = expandContexts(constraints.ccs)
+    val contexts = expandContexts(constraints.ccs, constraints.cvcs)
     println("ctx: " + contexts)
     val extraTypeConstraints = matchTypes(contexts, constraints.cvcs)
     val allTypeConstraints = constraints.tecs ++ extraTypeConstraints
@@ -88,21 +88,38 @@ object ConstraintSolver {
     })
   }
 
-  def expandContexts(constraints : Seq[ContextConstraint]) 
+  case class SolvedContext(contents : PolyContext, free : Boolean)
+
+  def expandContexts(
+    ccs : Seq[ContextConstraint], 
+    cvcs : Seq[ContextVarConstraint]) 
     : Map[ContextVar,PolyContext] = {
 
-    val constraintsById = 
-      (constraints.foldLeft
-        (Map.empty[ContextVar, ContextDefinition])
-        ((m, c) => m + Pair(c.context, c.definedAs)))
+    val ccById = 
+      (ccs.foldLeft
+        (Map.empty[ContextVar, ContextConstraint])
+        ((m, c) => m + (c.context -> c)))
 
-    val dependents : Map[ContextVar, Set[ContextVar]] =
-      (constraints.foldLeft
-        (Map.empty[ContextVar, Set[ContextVar]])
-        ((m, c) => c.definedAs match {
-          case cwd : ContextWithDependency => 
-            m.updated(cwd.base, m.getOrElse(cwd.base, Set.empty) + c.context)
-          case bc : BaseContext => m
+    val cvcsByContext =
+      (cvcs.foldLeft
+        (Map.empty[ContextVar, Seq[ContextVarConstraint]])
+        ((m, c) => m.updated(c.context, m.getOrElse(c.context, c +: Seq.empty)))
+      )
+
+    val (roots, dependencies) =
+      (ccs.foldLeft
+        (Pair(Map.empty[ContextVar, ContextConstraint], 
+              Map.empty[ContextVar, Set[ContextConstraint]]))
+        ((result, c) => c.definedAs match {
+          case cwd : ContextWithDependency => {
+            val (roots, deps) = result
+            val amendedDeps = deps.getOrElse(cwd.base, Set.empty) + c
+            (roots, deps.updated(cwd.base, amendedDeps))
+          }
+          case bc : BaseContext => {
+            val (roots, deps) = result
+            (roots + (c.context -> c), deps)
+          }
         })
       )
 
@@ -110,90 +127,183 @@ object ConstraintSolver {
     // that the dependency graph is a forest. Solve all constraints from
     // the roots to leaves
 
-    val allDependents = 
-      (dependents.values.foldLeft
-        (Set.empty[ContextVar])
-        ((s, cvs) => s ++ cvs)
-      )
+    var contexts = Map.empty[ContextVar, SolvedContext]
+    var transRoots = Map.empty[ContextVar, ContextVar]
 
-    var roots : Set[ContextVar] = constraintsById.keySet -- allDependents
-
-    var contexts : Map[ContextVar, PolyContext] = 
-      (roots.foldLeft
-        (Map.empty[ContextVar, PolyContext])
-        ((m, r) => 
-          constraintsById(r) match {
-            case bc : BaseContext => 
-              m + Pair(r, solveContextConstraint(bc, Map.empty))
-            case _ => 
-              throw new BadRootContextDef(constraintsById(r))
-          })
-      )
-
-    var available = roots.flatMap(r => dependents.getOrElse(r, Set.empty))
+    var available : Set[ContextVar] = roots.keySet
     while(!available.isEmpty) {
       val next = available.head
-      contexts += 
-        Pair(next, solveContextConstraint(constraintsById(next), contexts))
-      available = dependents.getOrElse(next, Set.empty) ++ available.tail
+      var (contextsUpdated, transRootsUpdated) = 
+        solveCtxConstraint(ccById(next), contexts, transRoots)
+
+      contexts = contextsUpdated
+      transRoots = transRootsUpdated
+
+      val localCvcs = cvcsByContext.getOrElse(next, Seq.empty)
+      contexts =
+        (localCvcs.foldLeft
+          (contexts)
+          ((ctxs, cvc) => checkForFreeVariable(cvc, ctxs, transRoots))
+        )
+      
+      val tail : Set[ContextVar] = available.tail
+      val depCcs = dependencies.getOrElse(next, Set.empty[ContextConstraint])
+      val depCtxs = depCcs.map(_.context)
+      available = depCtxs ++ tail
     }
 
-    contexts
+    contexts.mapValues(sc => sc.contents)
   }
 
-  def solveContextConstraint(
-    cd : ContextDefinition, 
-    contexts : Map[ContextVar, PolyContext]) : PolyContext = {
+  def solveCtxConstraint(
+    cc : ContextConstraint,
+    contexts : Map[ContextVar, SolvedContext],
+    transRoots : Map[ContextVar, ContextVar]) 
+    : (Map[ContextVar, SolvedContext], Map[ContextVar, ContextVar]) = {
 
-    cd match {
-      case bc : BaseContext => bc.vars
-      case cwd : ContextWithDependency => {
-        if(!contexts.contains(cwd.base)) throw new UnresolvedDependency(cwd)
-        updateContext(cwd, cwd.base, contexts(cwd.base))
+    cc.definedAs match {
+      case BaseContext(contents, free) => {
+        val contexts2 = contexts + (cc.context -> SolvedContext(contents, free))
+        val transRoots2 = transRoots + (cc.context -> cc.context)
+        (contexts2, transRoots2)
       }
+      case cd : ContextWithDependency =>
+        contexts.get(cd.base) match {
+          case None => throw new UnresolvedDependency(cd)
+          case Some(base) => {
+            val contexts2 = 
+              normaliseContext(cc.context, cd, contexts, transRoots)
+            val transRoots2 = transRoots + (cc.context -> transRoots(cd.base))
+            (contexts2, transRoots2)
+          }
+        }
     }
   }
 
-  def updateContext(
+  def normaliseContext(
+    ctxVar : ContextVar,
     spec : ContextWithDependency, 
-    baseVar : ContextVar,
-    base : PolyContext) : PolyContext = {
-    spec match {
-      case ModifiedContext(_, changedVars) => {
-        var context = base
-        changedVars.keySet.foreach(v => {
-          if(!context.contains(v)) {
-            println("mv " + v)
-            println(context)
-            throw new MissingVariable(baseVar, v)
-          }
-          context = context.updated(v, changedVars(v))
-        })
+    contexts : Map[ContextVar, SolvedContext],
+    transRoots : Map[ContextVar, ContextVar]) 
+    : Map[ContextVar, SolvedContext] = {
 
-        context
+    val base = contexts(spec.base)
+    spec match {
+      case ModifiedContext(baseVar, changedVars) => {
+        val updatedContexts =
+          (changedVars.foldLeft
+            (contexts)
+            ((ctxs, varChange) => {
+              checkForFreeVariable(
+                varChange._1, 
+                varChange._2, 
+                spec.base, 
+                ctxs, 
+                transRoots)
+            })
+          )
+
+        val baseContents = updatedContexts(spec.base).contents
+        val updatedContents = (changedVars.foldLeft(baseContents)(_ + _))
+
+        updatedContexts + (ctxVar -> SolvedContext(updatedContents, false))
       }
         
-      case ContextAddition(_, additions) =>
-        (additions.foldLeft
-          (base)
-          ((ctx, p) => {
-            if(base.contains(p._1)) 
-              throw new DuplicateDefinition(baseVar, p._1)
-            ctx + p
-          })
-        )
+      case ContextAddition(baseVar, additions) => {
+        val updatedContents = 
+          (additions.foldLeft
+            (base.contents)
+            ((contents, varAdd) => {
+              if(contents.contains(varAdd._1)) {
+                throw new DuplicateDefinition(baseVar, varAdd._1)
+              }
+              contents + varAdd
+            })
+          )
 
-      case ContextRemoval(_, removedVar) => {
-        if(!base.contains(removedVar)) {
-          println(spec)
-          println("mv " + removedVar)
-          println(baseVar + " = " + base)
-          throw MissingVariable(baseVar, removedVar)
-        }
+        contexts + (ctxVar -> SolvedContext(updatedContents, false))
+      }
 
-        base - removedVar
+      case ContextRemoval(baseVar, removedVar) => {
+        // FIXME: type variable needs to be fresh!
+        val ctxs = checkForFreeVariable(
+          removedVar, 
+          VarTE(TypeVar(0)), 
+          spec.base, 
+          contexts, 
+          transRoots)
+
+        val updatedContents = contexts(spec.base).contents - removedVar
+        ctxs + (ctxVar -> SolvedContext(updatedContents, false))
       }
     }
+  }
+
+  def checkForFreeVariable(
+    cvc : ContextVarConstraint,
+    contexts : Map[ContextVar, SolvedContext],
+    transRoots : Map[ContextVar, ContextVar])
+    : Map[ContextVar, SolvedContext] =
+    checkForFreeVariable(
+      cvc.varName, 
+      cvc.typeExpr, 
+      cvc.context, 
+      contexts, 
+      transRoots)
+
+  def checkForFreeVariable(
+    varName : String,
+    varType : TypeExpr,
+    ctxVar : ContextVar,
+    contexts : Map[ContextVar, SolvedContext],
+    transRoots : Map[ContextVar, ContextVar])
+    : Map[ContextVar, SolvedContext] = {
+
+    val ctx = contexts(ctxVar)
+    if(ctx.contents.get(varName).isDefined) {
+      return contexts
+    }
+
+    // variable is not defined, so we must add it to the root and
+    // all dependents as it is a free variable. 
+    // However, if the variable is already defined
+    // in any of the dependent contexts, then the free variable has been
+    // rebound illegally.
+    addFreeVariable(
+      varName, 
+      varType, 
+      transRoots(ctxVar), 
+      contexts, 
+      transRoots)
+  }
+
+  def addFreeVariable(
+    varName : String, 
+    varType : TypeExpr, 
+    ctxVar : ContextVar,
+    contexts : Map[ContextVar, SolvedContext],
+    transRoots : Map[ContextVar, ContextVar])
+    : Map[ContextVar, SolvedContext] = {
+
+    val ctx = contexts(ctxVar)
+    if(!ctx.free) throw new MissingVariable(ctxVar, varName)
+
+    val ctxDeps = transRoots.filter(_._2 == ctxVar).keySet
+    val duplicate = ctxDeps.find(contexts(_).contents.contains(varName))
+    if(duplicate.isDefined) {
+      throw new DuplicateDefinition(duplicate.get, varName)
+    }
+
+    val varBind = (varName -> varType)
+    
+    (ctxDeps.foldLeft
+      (contexts.updated(ctxVar, ctx.copy(contents = ctx.contents + varBind)))
+      ((ctxs, depCtxVar) => {
+        val depCtx = ctxs(depCtxVar)
+        val updatedContents = depCtx.contents + varBind
+        ctxs.updated(depCtxVar, depCtx.copy(contents = updatedContents))
+      })
+    )
   }
 
   /**
@@ -263,6 +373,8 @@ object ConstraintSolver {
         })
       )
 
+    log.debug("knownObjectStates = " + knownObjectStates)
+
     // populate states with methods
     val statesWithMethods = 
       (updatedConstraints.foldLeft
@@ -270,11 +382,12 @@ object ConstraintSolver {
         ((m, c) => {
           val method = MethodTE(c.method, c.retType, c.nextState)
           log.debug("processing " + method)
-          val state = m(c.objVar).getOrElse(c.stateVar, initState(c.stateVar))
+          val obj = m.get(c.objVar).getOrElse(Map.empty[TypeVar, StateTE])
+          val state = obj.getOrElse(c.stateVar, initState(c.stateVar))
           // TODO: check if method already exists, if so, further
           // constraint solving may be necessary?
           val updatedState = state.copy(methods = method +: state.methods)
-          m.updated(c.objVar, m(c.objVar).updated(c.stateVar, updatedState))
+          m + (c.objVar -> (obj + (c.stateVar -> updatedState)))
         })
       ).mapValues(stateMap => Seq.empty ++ stateMap.values)
 
@@ -333,11 +446,12 @@ object ConstraintSolver {
     }
 
     te match {
-      case VarTE(tv) => typeVarMap(tv) match {
-        case VarTE(tv2) if tv == tv2 => 
+      case VarTE(tv) => typeVarMap.get(tv) match {
+        case Some(VarTE(tv2)) if tv == tv2 => 
           // this variable cannot be eliminated
           Pair(Set(tv), VarTE(tv))
-        case other => eliminateVariables(other, typeVarMap, objects)
+        case Some(other) => eliminateVariables(other, typeVarMap, objects)
+        case None => Pair(Set(tv), VarTE(tv))
       }
       case UnitTE => Pair(Set.empty, UnitTE)
       case FunTE(effects, ret) => {
@@ -361,7 +475,7 @@ object ConstraintSolver {
         val canonicalObjectVar = toCanonicalVar(objVar, typeVarMap)
         objects.get(canonicalObjectVar) match {
           case Some(states) => 
-            (Set.empty, SolvedObjectTE(states, canonicalStateVar))
+            (Set.empty, SolvedObjectTE(canonicalObjectVar, states, canonicalStateVar))
           case None => 
             throw new IllegalArgumentException("unknown object " + objVar)
         }
@@ -390,7 +504,7 @@ object ConstraintSolver {
             ), 
             makeTypeExplicit(ret, substitution)
           )
-        case SolvedObjectTE(states, state) => 
+        case SolvedObjectTE(objVar, states, state) => 
           ObjType(states.map(makeStateExplicit(_, substitution)), 
             typeVarToName(state))
         case o : ObjectTE => {
