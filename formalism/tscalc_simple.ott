@@ -5,48 +5,43 @@ metavar termvar, x, y, z, p ::=   {{ com  term variable }}
 metavar statevar, S ::=  {{ com  state variable }}
 metavar methvar, m ::=  {{ com  method variable }}
 
-metavar infertypevar, a ::= {{ com type variable }} {{ tex \alpha }}
-metavar inferobvar, w ::=   {{ com object protocol variable }} {{ tex \omega }}
-metavar inferstatevar, s ::= {{ com state variable (inference) }} {{ tex \sigma }}
+metavar infertypevar, a {{ tex \alpha }} ::= {{ com type variable }}
+metavar inferctxvar, g {{ tex \gamma }} ::= {{ com context variable }}
 
 
 indexvar i, j, k ::=
 
 grammar
+v :: 'v_' ::=                                                                        {{ com values }}
+  | unit                                                      ::  :: Unit            {{ com unit lit. }}
+  | o @ S                                                     ::  :: Object          {{ com object lit. }}
+  | \ ( </ xi : Ti >> Ti' // i /> ) . t                       ::  :: FunDef          {{ com function lit. }}
+  | \ ( </ xi // i /> ) . t                                   :: M:: FunDefErased    {{ com function literal (types erased) }}
+
 t :: 't_' ::=                                                                        {{ com terms    }}
-  | unit                                                      ::  :: Unit            {{ com unit literal }}
-  | o @ S                                                     ::  :: Object          {{ com object literal }}
-  | \ ( </ xi : Ti >> Ti' // i /> ) . t                       ::  :: FunDef          {{ com function literal  }}
-  | \ ( </ xi // i /> ) . t                                   :: M:: FunDefErased    {{ com function literal (types erased)  }}
+  | v                                                         ::  :: Value           {{ com value    }}
   | let x = t in t'                                           ::  :: LetBind         {{ com let binding }}
-  | x := t                                                    ::  :: VarUpdate       {{ com variable update }}
-  | x ( </ xi // i /> )                                       ::  :: FunCall         {{ com function application  }}
-  | x . m                                                     ::  :: MethCall        {{ com method call }}
+  | x := t                                                    ::  :: VarUpdate       {{ com update }}
+  | x ( </ xi // i /> )                                       ::  :: FunCall         {{ com fun. call }}
+  | x . m                                                     ::  :: MethCall        {{ com method inv. }}
   | t ; t'                                                    ::  :: Seq             {{ com sequencing }}
   | { </ xi / yi // i /> } t                                  :: M:: Subst           {{ com substitution }}
 
-v :: 'v_' ::=                                                                        {{ com values }}
-  | unit                                                      ::  :: Unit            {{ com unit literal }}
-  | o @ S                                                     ::  :: Object          {{ com object literal }}
-  | \ ( </ xi : Ti >> Ti' // i /> ) . t                       ::  :: FunDef          {{ com function literal }}
-  | \ ( </ xi // i /> ) . t                                   :: M:: FunDefErased    {{ com function literal (types erased) }}
 
-o :: 'o_' ::=                                    {{ com object literal body }}
+o :: 'o_' ::=                                    {{ com object defn. }}
   | [ </ svi // i /> ]      ::  :: Body
 
 sv :: 'sv_' ::=
   | S { </ mi = ( vi , Si ) // i /> }    ::  :: State {{ com state declaration }}
 
-T :: 'T_' ::=                                                               {{ com types                    }}
-  | O @ S                                                   ::   :: ObjType {{ com object type              }}
-  | Unit                                                    ::   :: Unit    {{ com unit type                }}
-  | ( </ Ti >> Ti' // i /> ) -> T                           ::   :: Fun     {{ com function type            }}
-  | a                                                      ::  M:: TypeVar {{ com type variable            }}
+T :: 'T_' ::=                                                               {{ com types               }}
+  | O @ S                                                   ::   :: ObjType {{ com object              }}
+  | Unit                                                    ::   :: Unit    {{ com unit                }}
+  | ( </ Ti >> Ti' // i /> ) -> T                           ::   :: Fun     {{ com function            }}
   | forall </ ai // i /> . T                               ::  M:: UniType {{ com universal quantification }}
 
-O :: 'O_' ::=                                                         {{ com object protocols }}
+O :: 'O_' ::=                                                         {{ com states }}
   | { </ sti // i /> }                          ::   :: Protocol
-  | w                                          ::  M:: ObjVar
 
 st :: 'st_' ::=
   | S { </ mi : Ti >> Si // i /> }       ::  :: State {{ com state type }}
@@ -64,36 +59,41 @@ mu {{ tex \mu }} :: 'mu_' ::=                 {{ com stores }}
 
 C :: 'C_' ::=                                      {{ com constraints         }}
   | empty                      ::  :: Empty        {{ com no constraint       }}
-  | g                          ::  :: Context      {{ com context constraint  }}
-  | tau                        ::  :: Type         {{ com type constraint     }}
-  | phi                        ::  :: Protocol     {{ com protocol constraint }}
-  | B^ </ Ci // i />           ::  :: CList        {{ com constraint list conjunction }}
-  | C ^ C'                     ::  :: CAnd         {{ com constraint conjunction }}
+  | ctxc                       ::  :: Context      {{ com context constr.  }}
+  | tyc                        ::  :: Type         {{ com type constr.     }}
+  | protoc                     ::  :: Protocol     {{ com protocol constr. }}
+  | B^ </ Ci // i />           :: M:: CList        {{ com list conjunction }}
+  | C ^ C'                     ::  :: CAnd         {{ com conjunction }}
 
-g {{ tex \gamma }} :: 'gc_' ::=                   {{ com context constraints }}
-  | ex </ Gi // i /> . C            ::  :: ExGamma      {{ com context existence }}
-  | G ( x ) = T                     ::  :: Var          {{ com variable constraint  }}
-  | G = </ xi : ai // i />          ::  :: Explicit     {{ com explicit specification }}
-  | G = G'                          ::  :: Equality     {{ com context equality }}
-  | G = G' , x : T                  ::  :: Extension    {{ com variable extension }}
-  | G = G' [ x |-> T ]              ::  :: Replacement  {{ com variable update }}
-  | G = G' / { x }                  ::  :: Removal      {{ com variable removal }}
+ctxc {{ tex \mathcal{C} }} :: 'gc_' ::=                   {{ com context constraints }}
+  | ex </ gi // i /> . C            ::  :: ExGamma      {{ com context variable }}
+  | g = empty                       ::  :: Empty        {{ com empty context }}
+  | free g                          ::  :: Free         {{ com free context  }}
+  | g = g'                          ::  :: Equality     {{ com context equality }}
+  | g = g' , </ xi : tinfi // i />  ::  :: Explicit     {{ com extension }}
+  | g = g' [ x |-> tinf ]           ::  :: Replacement  {{ com replacement }}
+  | g = g' - { x }                  ::  :: Removal      {{ com removal }}
+  | x : tinf setin g                ::  :: Var          {{ com variable type }}
 
-tau {{ tex \tau }} :: 't_' ::=                                    {{ com type variable constraints }}
-  | ex </ ai // i /> . C      ::  :: ExTy         {{ com type existence     }}
-  | a = T                     ::  :: TypeEquality {{ com type equality   }}
+tyc {{ tex \mathcal{T} }} :: 't_' ::=                                    {{ com type expr. constraints }}
+  | ex </ ai // i /> . C      ::  :: ExTy         {{ com type variable }}
+  | tinf = tinf'              ::  :: TypeEquality {{ com type equality }}
 
-phi {{ tex \phi }} :: 'p_' ::=                     {{ com object protocol constraint }}
-  | ex </ wi // i /> . C         ::  :: ExObject      {{ com object protocol existence  }}
-  | ex </ si // i /> . C         ::  :: ExState       {{ com state existence }} 
-  | m : T >> s' setin w @ s      ::  :: Method        {{ com method constraint }}
+protoc {{ tex \mathcal{P} }} :: 'p_' ::=                     {{ com protocol constraints }}
+  | m : tinf => a setin a' @ a''   ::  :: Method        {{ com method }}
 
+tinf {{ tex \mathbb{T} }} :: 'TInf_' ::=                    {{ com type expressions }}
+  | a                                       ::  :: Hole     {{ com type variable }}
+  | a @ a'                                  ::  :: Object   {{ com object }}
+  | Unit                                    ::  :: Unit     {{ com unit }}
+  | ( </ tinfi >> tinfi' // i /> ) -> tinf    ::  :: FunType  {{ com function }}
 
 terminals :: 'terminals_' ::=
   | \            ::  :: lambda     {{ tex \lambda }}
   | -->          ::  :: red        {{ tex \longrightarrow }}
   | >>           ::  :: typechange {{ tex \gg }}
   | ->           ::  :: func       {{ tex \rightarrow }}
+  | =>           ::  :: match      {{ tex \Rightarrow }}
   | empty        ::  :: empty      {{ tex \emptyset }}
   | |->          ::  :: map        {{ tex \mapsto }}
   | setin        ::  :: contains   {{ tex \in }}
@@ -105,10 +105,6 @@ terminals :: 'terminals_' ::=
   | B^           ::  :: bigand     {{ tex \bigwedge }}
   | ^            ::  :: and        {{ tex \wedge }}
   | cap          ::  :: cap        {{ tex \cap }}
-
-
-subrules
-  v <:: t
 
 defns
 Jop :: '' ::=
@@ -157,7 +153,9 @@ Jop :: '' ::=
  valid ( mu , mu' )
 
  defn
- t | mu --> t' | mu' :: ::reduce::'r_' {{ com [[t]] with store [[mu]] reduces to [[t']] with store [[mu']] }} by
+ t | mu --> t' | mu' :: ::reduce::'r_' {{ com [[t]] with store [[mu]] reduces to [[t']] with store [[mu']] }}
+ {{ tex [[t]] \mid [[mu]] \; [[-->]] \; [[t']] \mid [[mu']] }}
+  by
 
 
     t' | mu --> t'' | mu'
@@ -307,7 +305,6 @@ defns Jty :: '' ::=
   G |> t : T <| G' , G''
   ---------------------- :: drop
   G |> t : T <| G'
-
 
 %  defn
 %  [[ G |> t : a <| G' ]] = C  ::  ::cgen::'cg_'  {{ com constraint [[C]] generated from typing of [[t]] }} by
