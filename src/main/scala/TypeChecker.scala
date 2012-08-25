@@ -95,7 +95,7 @@ object TypeChecker {
       }
       case FunValue(params,body) => 
         FunType(params.map(_->pEffect), body->ttype)
-      case LetBind(_,_,_) => UnitType()
+      case LetBind(_,_,body) => body->ttype
       case Update(_,_) => UnitType()
       case Sequence(l,r) => r->ttype
       case t @ MethCall(o,m) => 
@@ -125,13 +125,20 @@ object TypeChecker {
     childAttr {
       case t => {
         case FunValue(params,body) => contextFromParams(params)
-        case p @ LetBind(name,value,body) =>
-          (if (t eq value) p->input 
-           else value->output + Pair(p.varName,p.value->ttype))
-        case p @ Update(_,_) => p->input
+        case p @ LetBind(name,value,body) => {
+          if (t eq value) p->input
+          else value->output + Pair(p.varName,p.value->ttype)
+        }
+        case p @ Update(varName,_) => {
+          val ctx = (p->input) - varName
+          ctx
+        }
         case p @ Sequence(left, right) => 
           (if (t eq left) p->input else p.left->output)
-        case _ => emptyContext
+        case other => {
+          println("unmatched case " + other + " --- " + t)
+          emptyContext
+        }
       }
     }
 
@@ -186,8 +193,30 @@ object TypeChecker {
     val newParamTypes = inputType(t, t.funName) match {
       case Some(x) => x match {
         case FunType(defParams,_) => {
-          // TODO: check input param types match declared function param types
-          defParams.map(_.after)
+          val paramTypes = t.paramNames.map(param => {
+            val ty = inputType(t, param) match {
+              case Some(ty) => ty
+              case None => {
+                message(t, "unknown parameter variable " + param)
+                ErrorType()
+              }
+            }
+
+            (param, ty)
+          })
+          defParams.zip(paramTypes).map(p => {
+            val (effectType, param) = p
+            val (paramName, paramType) = param
+            if(effectType.before != paramType && paramType != ErrorType()) {
+              message(t, "parameter " + paramName 
+                + " is not of the required type for function " +
+                t.funName + ": expected " + effectType.before +
+                ", but found " + paramType)
+            }
+            // always just produce the output type as defined on the effect
+            // as this may allow more errors to be found in the program
+            effectType.after
+          })
         }
         case ErrorType() => t.paramNames.map(_ => ErrorType())
         case x => {
