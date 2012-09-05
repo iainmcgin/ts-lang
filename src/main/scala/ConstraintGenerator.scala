@@ -76,7 +76,7 @@ object ConstraintGenerator {
     (t->tvGen).reset()
     (t->cvGen).reset()
 
-    (ConstraintSet.empty +
+    (ConstraintSet() +
     ContextConstraint(t->inContextVar, BaseContext(Map.empty, true)) ++
     allConstraints(t))
   }
@@ -85,21 +85,21 @@ object ConstraintGenerator {
   def allConstraints(t : Term) : ConstraintSet =
     (t->constraints) ++ 
     (t match {
-      case UnitValue() => ConstraintSet.empty
+      case UnitValue() => ConstraintSet()
       case o @ ObjValue(states,_) => methodConstraints(o)
       case FunValue(_,body) => allConstraints(body)
       case LetBind(_,value,body) => 
         allConstraints(value) ++ allConstraints(body)
       case Update(_, body) => allConstraints(body)
-      case MethCall(_,_) => ConstraintSet.empty
+      case MethCall(_,_) => ConstraintSet()
       case Sequence(left, right) => 
         allConstraints(left) ++ allConstraints(right)
-      case FunCall(_,_) => ConstraintSet.empty
+      case FunCall(_,_) => ConstraintSet()
     })
 
   def methodConstraints(o : ObjValue) =
     (o.states.foldLeft
-      (ConstraintSet.empty)
+      (ConstraintSet())
       ((cs, state) => {
         val sv = state->stateVar
         (state.methods.foldLeft
@@ -131,13 +131,13 @@ object ConstraintGenerator {
     }
 
   def unitValueConstraints(t : UnitValue) =
-    (ConstraintSet.empty +
+    (ConstraintSet() +
       TypeExprConstraint(VarTE(t->typeVar), UnitTE) +
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)))
     
 
   def objectValueConstraints(t : ObjValue) = {
-    (ConstraintSet.empty +
+    (ConstraintSet() +
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)) +
       TypeExprConstraint(
         VarTE(t->typeVar), createSolvedObject(t))
@@ -180,11 +180,11 @@ object ConstraintGenerator {
 
     val outTypeConstraints =
       (outTypeVars.foldLeft
-        (ConstraintSet.empty)
+        (ConstraintSet())
         ((c,p) => 
           c + ContextVarConstraint(t.body->outContextVar, p._1, p._2)))
 
-    outTypeConstraints ++ (ConstraintSet.empty +
+    outTypeConstraints ++ (ConstraintSet() +
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)) +
       ContextConstraint(t.body->inContextVar, 
         BaseContext(Map(inTypeVars: _*), false)) +
@@ -192,7 +192,7 @@ object ConstraintGenerator {
   }
 
   def letBindConstraints(t : LetBind) =
-    (ConstraintSet.empty +
+    (ConstraintSet() +
       ContextConstraint(t.value->inContextVar, sameAs(t->inContextVar)) +
       ContextConstraint(t.body->inContextVar, 
         addTo(t.value->outContextVar, t.varName, VarTE(t.value->typeVar))) +
@@ -203,7 +203,7 @@ object ConstraintGenerator {
 
   def updateConstraints(t : Update) = {
     val bodyType = VarTE(t.body->typeVar)
-    (ConstraintSet.empty +
+    (ConstraintSet() +
       ContextConstraint(t.body->inContextVar, 
         removeFrom(t->inContextVar, t.varName)) +
       ContextConstraint(t->outContextVar, 
@@ -213,7 +213,7 @@ object ConstraintGenerator {
   }
 
   def sequenceConstraints(t : Sequence) =
-    (ConstraintSet.empty +
+    (ConstraintSet() +
       ContextConstraint(t.left->inContextVar, sameAs(t->inContextVar)) +
       ContextConstraint(t.right->inContextVar, sameAs(t.left->outContextVar)) +
       ContextConstraint(t->outContextVar, sameAs(t.right->outContextVar)) +
@@ -221,29 +221,45 @@ object ConstraintGenerator {
     )
 
   def funCallConstraint(t : FunCall) = {
-    val paramTypeVars = 
-      t.paramNames.map(p => Tuple3(p, (t->tvGen).next(), (t->tvGen).next()))
-    val funEffects = paramTypeVars.map(t => EffectTE(VarTE(t._2), VarTE(t._3)))
-    val funRetTypeVar = (t->tvGen).next()
-    val funType = FunTE(funEffects, VarTE(funRetTypeVar))
+    // we generate three new type variables for every parameter:
+    // _1 - the name of the parameter
+    // _2 - the required input type for the formal parameter
+    // _3 - the expected output type for the formal parameter
+    // _4 - the actual type of the passed parameter in the context
+    case class ParamInfo(
+      name : String, 
+      in : TypeExpr, 
+      out : TypeExpr, 
+      actual : TypeExpr)
+
+    def newVarTE() = VarTE((t->tvGen).next())
+    def newParamInfo(name : String) = 
+      ParamInfo(name, newVarTE(), newVarTE(), newVarTE())
+
+    val paramTypeVars = t.paramNames.map(newParamInfo(_))
+    val funEffects = paramTypeVars.map(p => p.in >> p.out)
+    val retType = VarTE(t->typeVar)
+    val funType = FunTE(funEffects, retType)
 
     val paramConstraints = 
       (paramTypeVars.foldLeft
-        (ConstraintSet.empty)
-        ((c, p) => c + ContextVarConstraint(t->inContextVar, p._1, VarTE(p._2)))
+        (ConstraintSet())
+        ((c, p) => c + 
+          ContextVarConstraint(t->inContextVar, p.name, p.actual) +
+          SubtypeConstraint(p.actual, p.in)
+        )
       )
 
     val contextChangedVars =
       (paramTypeVars.foldLeft
         (Map.empty[String,TypeExpr])
-        ((m,p) => m + (p._1 -> VarTE(p._3))))
+        ((m,p) => m + (p.name -> p.out)))
 
     (paramConstraints ++
-      (ConstraintSet.empty +
+      (ConstraintSet() +
         ContextVarConstraint(t->inContextVar, t.funName, funType) +
         ContextConstraint(t->outContextVar, 
-          ModifiedContext(t->inContextVar, contextChangedVars)) +
-        TypeExprConstraint(VarTE(t->typeVar), VarTE(funRetTypeVar)))
+          ModifiedContext(t->inContextVar, contextChangedVars)))
     )
   }
 
@@ -254,7 +270,7 @@ object ConstraintGenerator {
     val inObjectType = ObjectTE(objectVar, inStateVar)
     val outObjectType = ObjectTE(objectVar, outStateVar)
     val methType = VarTE(t->typeVar)
-    (ConstraintSet.empty +
+    (ConstraintSet() +
       ContextVarConstraint(t->inContextVar, t.objVarName, inObjectType) +
       MethodConstraint(objectVar, inStateVar, t.methName, 
         methType, outStateVar) +

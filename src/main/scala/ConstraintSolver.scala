@@ -75,8 +75,17 @@ class ConstraintSolver(t : Term) {
     val contexts = expandContexts(constraints.ccs, constraints.cvcs)
     log.debug("expanded contexts: " + contexts)
     val extraTypeConstraints = matchTypes(contexts, constraints.cvcs)
-    val allTypeConstraints = constraints.tecs ++ extraTypeConstraints
+
+    // XXX: for now, treat all subtype constraints as equality, until a closure
+    // algorithm is implemented that finds correct solutions that respect
+    // subtyping
+    val subtypeConstraints = 
+      constraints.scs.map(sc => TypeExprConstraint(sc.a, sc.b))
+
+    val allTypeConstraints = 
+      constraints.tecs ++ extraTypeConstraints ++ subtypeConstraints
     log.debug("derived type constraints: " + allTypeConstraints)
+
     val varsToTypeExprsOpt = unifyTypes(allTypeConstraints)
     
     varsToTypeExprsOpt.map(varsToTypeExprs => {

@@ -11,15 +11,20 @@
 
 package uk.ac.gla.dcs.ts
 
-abstract class Constraint
+sealed abstract class Constraint
 
 /** 
- * Represents evidence that the specified type variable must be equal
- * to the specified type (which may itself be a type variable or contain
- * type variables in its structure).
+ * Represents evidence that a must be an equivalent type to b.
  */
 case class TypeExprConstraint(a : TypeExpr, b : TypeExpr) extends Constraint {
   override def toString = a + " = " + b
+}
+
+/**
+ * Represents evidence that a must be a subtype of b.
+ */
+case class SubtypeConstraint(a : TypeExpr, b : TypeExpr) extends Constraint {
+  override def toString = a + " <: " + b
 }
 
 /** 
@@ -115,39 +120,33 @@ case class BaseContext(vars : PolyContext, free : Boolean)
     (if (free) "<FREE> " else "<FIXED> ") + MapUtil.sortedStr(vars, " : ")
 }
 
-class ConstraintSet(
-    val ccs : Seq[ContextConstraint],
-    val cvcs : Seq[ContextVarConstraint],
-    val tecs : Seq[TypeExprConstraint],
-    val mcs : Seq[MethodConstraint]) {
+case class ConstraintSet(
+    ccs : Seq[ContextConstraint] = Seq.empty,
+    cvcs : Seq[ContextVarConstraint] = Seq.empty,
+    tecs : Seq[TypeExprConstraint] = Seq.empty,
+    scs : Seq[SubtypeConstraint] = Seq.empty,
+    mcs : Seq[MethodConstraint] = Seq.empty) {
 
-  def +(cc : ContextConstraint) = ConstraintSet(cc +: ccs, cvcs, tecs, mcs)
-  def +(cvc : ContextVarConstraint) = ConstraintSet(ccs, cvc +: cvcs, tecs, mcs)
-  def +(tec : TypeExprConstraint) = ConstraintSet(ccs, cvcs, tec +: tecs, mcs)
-  def +(mc : MethodConstraint) = ConstraintSet(ccs, cvcs, tecs, mc +: mcs)
+  def +(cc : ContextConstraint) = this.copy(ccs = cc +: ccs)
+  def +(cvc : ContextVarConstraint) = this.copy(cvcs = cvc +: cvcs)
+  def +(tec : TypeExprConstraint) = this.copy(tecs = tec +: tecs)
+  def +(sc : SubtypeConstraint) = this.copy(scs = sc +: scs)
+  def +(mc : MethodConstraint) = this.copy(mcs = mc +: mcs)
+  
 
   def ++(others : ConstraintSet) =
     ConstraintSet(
       ccs ++ others.ccs, 
       cvcs ++ others.cvcs,
       tecs ++ others.tecs,
+      scs ++ others.scs,
       mcs ++ others.mcs)
 
   override def toString = {
     val sortedCcs = ccs.sortBy(_.context.v)
 
-    (sortedCcs ++ cvcs ++ tecs ++ mcs).mkString("; ")
+    (sortedCcs ++ cvcs ++ tecs ++ scs ++ mcs).mkString("; ")
   }
-}
-
-object ConstraintSet {
-  def apply(
-    ccs : Seq[ContextConstraint],
-    cvcs : Seq[ContextVarConstraint],
-    tecs : Seq[TypeExprConstraint],
-    mcs : Seq[MethodConstraint]) = new ConstraintSet(ccs, cvcs, tecs, mcs)
-
-  val empty = ConstraintSet(Seq.empty, Seq.empty, Seq.empty, Seq.empty)
 }
 
 object MapUtil {
