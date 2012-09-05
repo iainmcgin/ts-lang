@@ -21,14 +21,30 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import org.slf4j.{Logger => SLF4JLogger}
 
+abstract class Command
+case class ShowTree(t : Term) extends Command
+case class Infer(debug : Option[String], t : Term) extends Command
+case class Exit() extends Command
 
-object Driver extends ParsingREPL[Term] with Parser {
+trait REPLParser extends org.kiama.util.PositionedParserUtilities with Parser {
+
+  lazy val command : PackratParser[Command] =
+    opt("tree") ~> term                ^^ ShowTree |
+    "infer" ~> opt("debug") ~ term     ^^ Infer |
+    "exit"                             ^^ (_ => Exit())
+}
+
+
+object Driver extends ParsingREPL[Command] with REPLParser {
 
   override def main(args : Array[String]) {
     if(!args.contains("-debug")) {
       disableLogging()
     }
-    println("TS REPL - press CTRL+D to exit. Type single-line terms for type analysis")
+    println("TS REPL - press CTRL+D to exit. Type single-line terms to view " +
+      "term tree with contexts, or type 'infer ...' to show type inference " +
+      "trace")
+
     super.main(args)
   }
 
@@ -38,19 +54,48 @@ object Driver extends ParsingREPL[Term] with Parser {
     root.setLevel(Level.OFF)
   }
 
-  override def start = phrase (term)
+  def enableLogging() {
+    val root = LoggerFactory.getLogger(SLF4JLogger.ROOT_LOGGER_NAME).asInstanceOf[Logger]
+    root.setLevel(Level.DEBUG)
+  }
 
-  override def process(t : Term) {
+  override def start = phrase (command)
+
+  override def process(c : Command) {
+    c match {
+      case ShowTree(t) => checkAndTrace(t)
+      case Infer(debug, t) => infer(debug.isDefined, t)
+      case Exit() => java.lang.System.exit(0)
+    }
+  }
+
+  def checkAndTrace(t : Term) {
     FullTracePrinter.resetTermIds
     resetmessages
     TypeChecker.check(t)
 
-    if(messagecount > 0) {
-      report()
-      false
-    }
+    if(messagecount > 0) report()
 
     println("full trace for term: ")
     println(FullTracePrinter.pretty(t))
+  }
+
+  def infer(debug : Boolean, t : Term) {
+    resetmessages
+    val constraints = ConstraintGenerator.generateConstraints(t)
+    println("constraints:\n" + constraints)
+    if(debug) enableLogging()
+    val solutionOpt = ConstraintSolver.solvePolymorphic(constraints, t)
+    if(debug) disableLogging()
+
+    println("----------")
+
+    if(messagecount > 0) report()
+
+    solutionOpt.foreach(soln => {
+      println("input context: " + soln._1)
+      println("type: " + soln._3)
+      println("output context: " + soln._4)
+    })
   }
 }

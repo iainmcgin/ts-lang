@@ -37,6 +37,7 @@ case class Update(varName : String, body : Term) extends Term
 case class MethCall(objVarName : String, methName : String) extends Term
 case class Sequence(left : Term, right : Term) extends Term
 case class FunCall(funName : String, paramNames : Seq[String]) extends Term
+case class If(condition : Term, whenTrue : Term, whenFalse : Term) extends Term
 
 /* term fragments */
 
@@ -100,9 +101,13 @@ case class StateSpec(name : String, methods : Seq[MethodSpec]) {
   def nextState(method : String) = 
     (methodMap get method) map ((ms : MethodSpec) => ms.nextState)
   def retType(method : String) = (methodMap get method) map (_.ret)
+
+  override def toString = name + "{ " + methods.mkString("; ") + " }"
 }
 
-case class MethodSpec(name : String, ret : Type, nextState : String)
+case class MethodSpec(name : String, ret : Type, nextState : String) {
+  override def toString = name + " : " + ret + " ⇒ " + nextState
+}
 
 case class EffectType(before : Type, after : Type) {
   override def toString = before + " ≫ " + after

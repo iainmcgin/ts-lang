@@ -135,8 +135,11 @@ object TypeChecker {
         }
         case p @ Sequence(left, right) => 
           (if (t eq left) p->input else p.left->output)
-        case other => {
-          println("unmatched case " + other + " --- " + t)
+        case p if p != null && p.isRoot => {
+          emptyContext
+        }
+        case p => {
+          println("unmatched case " + p + " --- " + t)
           emptyContext
         }
       }

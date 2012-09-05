@@ -53,8 +53,7 @@ class ConstraintSolver(t : Term) {
       val (inCtx, freeTypeVars, termTe, outCtx) = soln
       if(!freeTypeVars.isEmpty) {
         message(t,
-          "term is polymorphic with type ∀" + freeTypeVars.mkString(",") +
-          "." + termTe + " --- substituting Unit for all type variables")
+          "term is polymorphic, substituting Unit for all type variables")
       }
 
       val unitSubstitution = ((v : TypeVar) => UnitType())
@@ -101,7 +100,7 @@ class ConstraintSolver(t : Term) {
 
       val (free, termTe) = 
         eliminateVariables(
-          varsToTypeExprs(t->typeVar), 
+          varsToTypeExprs.getOrElse(t->typeVar, VarTE(t->typeVar)), 
           varsToTypeExprs, 
           objects)
 
@@ -124,7 +123,7 @@ class ConstraintSolver(t : Term) {
     val cvcsByContext =
       (cvcs.foldLeft
         (Map.empty[ContextVar, Seq[ContextVarConstraint]])
-        ((m, c) => m.updated(c.context, m.getOrElse(c.context, c +: Seq.empty)))
+        ((m, c) => m.updated(c.context, c +: m.getOrElse(c.context, Seq.empty)))
       )
 
     val (roots, dependencies) =
@@ -154,6 +153,7 @@ class ConstraintSolver(t : Term) {
     var available : Set[ContextVar] = roots.keySet
     while(!available.isEmpty) {
       val next = available.head
+
       var (contextsUpdated, transRootsUpdated) = 
         solveCtxConstraint(ccById(next), contexts, transRoots)
 
@@ -215,9 +215,12 @@ class ConstraintSolver(t : Term) {
           (changedVars.foldLeft
             (contexts)
             ((ctxs, varChange) => {
+              // if the variable we are modifying is free, then
+              // we know nothing about its type yet and so generate
+              // a new type variable for it.
               checkForFreeVariable(
                 varChange._1, 
-                varChange._2, 
+                VarTE((t->tvGen).next()),
                 spec.base, 
                 ctxs, 
                 transRoots)
@@ -246,7 +249,6 @@ class ConstraintSolver(t : Term) {
       }
 
       case ContextRemoval(baseVar, removedVar) => {
-        // FIXME: type variable needs to be fresh!
         val ctxs = checkForFreeVariable(
           removedVar, 
           VarTE((t->tvGen).next()), 
@@ -290,6 +292,9 @@ class ConstraintSolver(t : Term) {
     // However, if the variable is already defined
     // in any of the dependent contexts, then the free variable has been
     // rebound illegally.
+
+    log.debug("free variable " + varName + " found with type " + varType)
+
     addFreeVariable(
       varName, 
       varType, 
