@@ -6,5 +6,5 @@ target
 *.log
 *.fdb_latexmk
 *.fls
-formalism/tscalc_simple.tex
+formalism/ts_defns.tex
 

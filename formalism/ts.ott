@@ -1,0 +1,573 @@
+%-------------------------------------------------------------------------------
+% This file is part of TS1.
+%
+% TS1 - Copyright (c) 2012, Iain McGinniss
+% All rights reserved.
+% 
+% Redistribution and use in source and binary forms, with or without
+% modification, are permitted under the terms of the 2-clause BSD license:
+% http://opensource.org/licenses/BSD-2-Clause
+%-------------------------------------------------------------------------------
+
+metavar termvar, x, y, z, p ::=
+{{ com  term variable }} {{ lex alphanum}} {{ tex \mathit{[[termvar]]} }}
+
+metavar statevar, S ::=  {{ com  state variable }}
+metavar methvar, m ::=  {{ com  method variable }}
+
+metavar infertypevar, a {{ tex \alpha }} ::= {{ com type variable }}
+metavar inferctxvar, g {{ tex \gamma }} ::= {{ com context variable }}
+
+indexvar i, j, k ::=
+
+%-------------------------------------------------------------------------------
+% MAIN GRAMMAR
+%-------------------------------------------------------------------------------
+
+grammar
+
+t :: 't_' ::= 
+{{ com terms }}
+  | v                          ::  :: Value
+    {{ com value }}
+  | if t then t' else t''      ::  :: Conditional
+    {{ com conditional }}
+  | x ( </ xi // i /> )        ::  :: FunCall
+    {{ com fun. call   }}
+  | x . m                      ::  :: MethCall
+    {{ com method inv. }}
+  | let x = t in t'            ::  :: LetBind
+    {{ com let bind }}
+  | x := t                     ::  :: VarUpdate
+    {{ com update }}
+  | t ; t'                     ::  :: Seq
+    {{ com sequencing }}
+  | { </ xi / yi // i /> } t   :: M:: Subst
+    {{ com substitution }}
+  | ( t )                      :: M:: BrTerm
+    {{ com nested term }}
+
+v :: 'v_' ::=
+{{ com values }}
+  | unit                                   ::  :: Unit
+    {{ com unit lit. }}
+  | true                                   ::  :: True
+    {{ com true lit. }}
+  | false                                  ::  :: False
+    {{ com false lit. }}
+  | o @ S                                  ::  :: Object
+    {{ com object lit. }}
+  | \ ( </ xi : Ti >> Ti' // i /> ) . t    ::  :: FunDef
+    {{ com function lit. }}
+  | \ ( </ xi // i /> ) . t                :: M:: FunDefErased
+    {{ com function literal (types erased) }}
+
+o :: 'o_' ::=
+{{ com object defn. }}
+  | [ </ svi // i /> ]      ::  :: Body
+
+
+sv :: 'sv_' ::=
+{{ com state defn. }}
+  | S { </ mi = ( vi , Si ) // i /> }    ::  :: State 
+    {{ com state declaration }}
+
+%-----------
+% TYPES    -
+%-----------
+
+T, U, V :: 'T_' ::=
+{{ com types }}
+  | Unit                                  ::  :: Unit
+    {{ com unit }}
+  | Bool                                  ::  :: Boolean
+    {{ com boolean }}
+  | O @ S                                 ::  :: ObjType
+    {{ com object }}
+  | ( </ Ti >> Ti' // i /> ) -> T         ::  :: Fun
+    {{ com function }}
+  | forall </ ai // i /> . T              :: M:: UniType
+    {{ com universal quantification }}
+
+
+O :: 'O_' ::= 
+{{ com object body }}
+  | { </ sti // i /> }    ::   :: Protocol
+
+
+st :: 'st_' ::=
+{{ com object state }}
+  | S { </ mi : Ti >> Si // i /> }    ::  :: State
+
+
+%---------------
+% ANCILLARY    -
+%---------------
+
+G {{ tex \Gamma }} :: 'G_' ::=             
+{{ com contexts }}
+  | empty                  :: S:: Empty
+    {{ com empty context }}
+  | </ xi : Ti // i />     ::  :: VarList  
+    {{ com variable type list }}
+  | G , G'                 :: M:: Concat
+    {{ com concatenation of contexts }}
+
+
+mu {{ tex \mu }} :: 'mu_' ::=                 
+{{ com stores }}
+  | empty                                :: S:: Empty   
+    {{ com empty store }}
+  | </ xi |-> vi // i />                 ::  :: VarList 
+    {{ com variable mapping list }}
+  | mu , mu'                             :: M:: Concat
+    {{ com concatenation of stores }}
+  | mu [ x |-> v ]                       :: M:: Replace
+
+%-----------------
+% CONSTRAINTS    -
+%-----------------
+
+C :: 'C_' ::=
+{{ com constraints }}
+  | empty                         ::  :: Empty
+    {{ com no constraint }}
+  | ctxc                          ::  :: Context
+    {{ com context constr. }}
+  | tyc                           ::  :: Type
+    {{ com type constr. }}
+  | protoc                        ::  :: Protocol
+    {{ com protocol constr. }}
+  | C ^ C'                        ::  :: CAnd
+    {{ com conjunction }}
+
+
+ctxc {{ tex \mathcal{C} }} :: 'gc_' ::=
+{{ com context constraints }}
+  | ex </ gi // i /> . C            ::  :: ExGamma
+    {{ com context variable }}
+  | g = empty                       ::  :: Empty
+    {{ com empty context }}
+  | free g                          ::  :: Free
+    {{ com free context  }}
+  | g = g'                          ::  :: Equality
+    {{ com context equality }}
+  | g = g' , </ xi : tinfi // i />  ::  :: Extension
+    {{ com extension }}
+  | g = g' [ x |-> tinf ]           ::  :: Replacement
+    {{ com replacement }}
+  | g = g' - { x }                  ::  :: Removal
+    {{ com removal }}
+  | g = g' join g''                 ::  :: Join
+    {{ com join }}
+  | x : tinf setin g                ::  :: Var
+    {{ com variable type }}
+
+
+tyc {{ tex \mathcal{T} }} :: 't_' ::=
+{{ com type expr. constraints }}
+  | ex </ ai // i /> . C      ::  :: ExTy
+    {{ com type variable }}
+  | tinf = tinf'              ::  :: Equality
+    {{ com equality  }}
+  | tinf <: tinf'             ::  :: Subtype
+    {{ com subtyping }}
+
+
+protoc {{ tex \mathcal{P} }} :: 'p_' ::=
+{{ com protocol constraints }}
+  | m : tinf => a setin a' @ a''   ::  :: Method
+    {{ com method }}
+
+
+tinf {{ tex \mathbb{T} }} :: 'TInf_' ::=
+{{ com type expressions }}
+  | a                                       ::  :: TVar
+    {{ com type variable }}
+  | oinf                                    ::  :: Object
+    {{ com object }}
+  | Unit                                    ::  :: Unit
+    {{ com unit }}
+  | ( </ tinfi >> tinfi' // i /> ) -> tinf  ::  :: FunType
+    {{ com function }}
+
+
+oinf {{ tex \mathbb{O} }} :: 'OInf_' ::=
+  | a @ a'                                  ::  :: Inferred
+    {{ com inferred object }}
+  | { </ sinfi // i /> } @ S                ::  :: Known
+    {{ com known object }}
+
+sinf {{ tex \mathbb{S} }} :: 'SInf_' ::=
+  | S { </ mi : ai => ai' // i /> }           ::  :: State
+
+%-----------------------------
+% TEX RULES FOR TERMINALS    -
+%-----------------------------
+
+terminals :: 'terminals_' ::=
+  | \            ::  :: lambda     {{ tex \lambda }}
+  | -->          ::  :: red        {{ tex \longrightarrow }}
+  | >>           ::  :: typechange {{ tex \gg }}
+  | ->           ::  :: func       {{ tex \rightarrow }}
+  | =>           ::  :: match      {{ tex \Rightarrow }}
+  | empty        ::  :: empty      {{ tex \emptyset }}
+  | |->          ::  :: map        {{ tex \mapsto }}
+  | setin        ::  :: contains   {{ tex \in }}
+  | |>           ::  :: contextin  {{ tex \triangleright }}
+  | <|           ::  :: contextout {{ tex \triangleleft }}
+  | notin        ::  :: notin      {{ tex \notin }}
+  | |-           ::  :: turnstile  {{ tex \vdash }}
+  | ex           ::  :: exists     {{ tex \exists }}
+  | B^           ::  :: bigand     {{ tex \bigwedge }}
+  | ^            ::  :: and        {{ tex \wedge }}
+  | cap          ::  :: cap        {{ tex \cap }}
+  | and          ::  :: booland    {{ tex \wedge }}
+  | or           ::  :: boolor     {{ tex \vee }}
+  | sim          ::  :: simulation {{ tex \sim }}
+  | join         ::  :: join       {{ tex \sqcup }}
+  | forall       ::  :: forall     {{ tex \forall }}
+  | equiv        ::  :: equiv      {{ tex \equiv }}
+  | unit         ::  :: unit       {{ tex \mathtt{unit} }}
+  | true         ::  :: true       {{ tex \mathtt{true} }}
+  | false        ::  :: false      {{ tex \mathtt{false} }}
+
+%-------------------------------------------------------------------------------
+% OPERATIONAL SEMANTICS
+%-------------------------------------------------------------------------------
+
+defns
+Jop :: '' ::=
+
+  defn
+  Val ( o @ S . m ) = v ::  ::valof::'valof_' by
+
+  defn
+  Next ( o @ S . m ) = S' ::  ::nextof::'nextof_' by
+
+  defn
+  mu ( x ) = v ::  ::mapof::'stmap_' by
+
+  defn
+  LV ( t ) = </ xi // i /> ::  ::localvars::'lv_' by
+
+  defn
+  fresh ( </ xi // i /> , mu ) ::  ::freshvars::'fresh_' by
+
+  defn
+  x notin mu ::  ::notin::'ni_' by
+
+  defn
+  dom ( G ) cap dom ( mu ) = empty ::  ::distinct::'di_' by
+
+  defn
+  dom ( mu ) cap dom ( mu' ) = empty ::  ::disjointstores::'ds_' 
+  {{ com [[mu]] is disjoint from [[mu']] }} by
+
+  defn
+  distinct ( </ xi // i /> ) ::  ::distinctvars::'dv_' by
+
+  defn
+  valid ( mu ) ::  ::validstore::'vs_' {{ com [[mu]] is a valid store }} 
+  by
+
+    --------------- :: empty
+    valid ( empty )
+
+    distinct ( </ xi // i /> )
+    --------------- :: vars
+    valid ( </ xi |-> vi // i /> )
+
+    valid ( mu )
+    valid ( mu' )
+    dom ( mu ) cap dom ( mu' ) = empty
+    ---------------------------------- :: concat
+    valid ( mu , mu' )
+
+
+  defn
+  t | mu --> t' | mu' :: ::reduce::'r_' 
+  {{ com [[t]] with store [[mu]] reduces to [[t']] with store [[mu']] }}
+  {{ tex [[t]] \mid [[mu]] \; [[-->]] \; [[t']] \mid [[mu']] }}
+  by
+
+    t' | mu --> t'' | mu'
+    ------------------------------------------------  :: let_term
+    let x = t' in t | mu --> let x = t'' in t | mu'
+
+
+    ------------------------------------------------  :: let_value
+    let x = v in t | mu --> t | mu [ x |-> v ]
+
+
+    t | mu --> t' | mu'
+    ------------------------------------------------  :: update_expr
+    x := t | mu , x |-> v --> x := t' | mu' , x |-> v
+
+
+    ------------------------------------------------  :: update_value
+    x := v | mu , x |-> v' --> unit | mu , x |-> v
+
+
+    t | mu --> t'' | mu'
+    ----------------------------- :: seq_left_term
+    t ; t' | mu --> t'' ; t | mu'
+
+    
+    --------------------- :: seq_left_value
+    v ; t | mu --> t | mu
+
+
+    mu ( x ) = \ ( </ pi : Ti >> Ti' // i /> ) . t
+    ----------------------------------------------------------  :: fun_call
+    x ( </ xi // i /> ) | mu --> { </ xi / pi // i /> } t | mu
+
+
+    Val ( o @ S . m ) = v
+    Next ( o @ S . m ) = S'
+    ----------------------------  :: meth_call
+    x . m | mu , x |-> o @ S --> v | mu , x |-> o @ S'
+
+
+    t1 | mu --> t1' | mu'
+    ------------------------------------------------------------- :: if_term
+    if t1 then t2 else t3 | mu --> if t1' then t2 else t3 | mu'
+
+
+    ----------------------------------------- :: if_true
+    if true then t1 else t2 | mu --> t1 | mu
+
+
+    ----------------------------------------- :: if_false
+    if false then t1 else t2 | mu --> t2 | mu
+
+
+%-------------------------------------------------------------------------------
+% TYPE RULES
+%-------------------------------------------------------------------------------
+
+defns Jty :: '' ::=
+
+  defn
+  G ( x ) = T  ::  ::typeof::'to_'
+  {{ com [[x]] has type [[T]] in [[G]] }} by
+
+
+  defn
+  Meth ( O @ S . m ) ::  ::validmeth::'vm_'
+  {{ com [[m]] is a known method of object type [[O]] at state [[S]]}} by
+
+
+  defn
+  Next ( O @ S . m ) = S' ::  ::nextstate::'ns_'
+  {{ com [[S']] is the next state after calling method [[m]] on object type 
+         [[O]] in state [[S]]}} by
+
+
+  defn
+  RType ( O @ S . m ) = T ::  ::returntype::'rt_'
+  {{ com [[T]] is the return type of method [[m]] on object type [[O]] in 
+         state [[S]]}} by
+
+
+  defn
+  x notin G  ::  ::notincontext::'ni_'
+  {{ com [[x]] is unknown in [[G]] }} by
+
+  defn
+  S setin </ svi // i />  ::  ::stateinstates::'sinsv_'
+  {{ com [[S]] is a defined state }} by
+
+  defn
+  sv : st   ::  ::methtype::'mt_'
+  {{ com state declaration [[sv]] matches state typing [[st]]}} by
+
+    empty |> vi : Ti <| empty
+    -------------------- :: state
+    S { </ mi = ( vi , Si ) // i /> } : S { </ mi : Ti >> Si // i /> }
+
+
+  defn
+  dom ( G ) cap dom ( G' ) = empty  ::  ::disjointgamma::'dg_'
+  {{ com [[G]] is disjoint from [[G']] }} by
+
+
+  defn
+  distinct ( </ xi // i /> ) ::  ::distinctvarsgamma::'dvg_' by
+
+
+  defn
+  valid ( G )  ::  ::validgamma::'vg_'
+  {{ com context [[G]] is valid}} 
+  by
+
+    ---------------- :: empty
+    valid ( empty )
+
+    distinct ( </ xi // i /> )
+    ---------------------------- :: vars
+    valid ( </ xi : Ti // i /> )
+
+    valid ( G )
+    valid ( G' )
+    dom ( G ) cap dom ( G' ) = empty
+    ------------- :: concat
+    valid ( G , G' )
+
+%---------------
+% valid stores -
+%---------------
+
+  defn
+  G |- mu  ::  ::storetype::'st_'
+  {{ com store [[mu]] is well typed against context [[G]] }} 
+  by
+
+    -------------- :: empty
+    empty |- empty
+
+
+    G |> vi : Ti <| G
+    Ti <: Ui
+    ------------------------------------------------ :: vars
+    </ xi : Ui // i /> |- </ xi |-> vi // i />
+
+
+    G |- mu
+    G' |- mu'
+    valid ( G , G' )
+    ---------------- :: concat
+    G, G' |- mu , mu'
+
+
+    G |- mu
+    ------------- :: extra
+    G |- mu , mu'
+
+%---------------
+% subtyping    -
+%---------------
+
+  defn
+  O @ S sim O' @ S' ::  ::simulation::'sim_'
+  {{ com [[O]]@[[S]] is a simulation of [[O']]@[[S']]}} by
+
+  defn
+  T <: T'  ::  ::subtype::'sub_'
+  {{ com [[T]] is a subtype of [[T']] }}
+  by
+
+    ------- :: refl
+    T <: T
+
+
+    T <: U
+    U <: V
+    ------- :: trans
+    T <: V
+
+    Ui <: Ti
+    Ti' <: Ui'
+    T <: U
+    --------------------------------------------------------------- :: fn
+    ( </ Ti >> Ti' // i /> ) -> T <: ( </ Ui >> Ui' // i /> ) -> U'
+
+
+    O @ S sim O' @ S'
+    -------------- :: obj
+    O @ S <: O' @ S'
+
+%---------------
+% typing rules -
+%---------------
+
+  defn
+  T join T' = U ::  ::jointypes::'jt_'
+  {{ com the joing of [[T]] and [[T']] is equal to [[U]] }} by
+
+
+  defn
+  G join G' = G'' ::  ::joinctx::'jg_'
+  {{ com [[G]] joined with [[G']] is equal to [[G'']] }} by
+
+  defn
+  G |> t : T <| G' :: ::type::'t_'  
+  {{ com [[t]] has type [[T]] in context [[G]], producing a new context [[G']]}}
+  by
+
+    --------------------- :: unit
+    G |> unit : Unit <| G
+
+
+    --------------------- :: true
+    G |> true : Bool <| G
+
+
+    ---------------------- :: false
+    G |> false : Bool <| G
+
+
+    svi : sti
+    S setin </ svi // i />
+    --------------------------------------------------------- :: object
+    G |> [ </ svi // i /> ] @ S : { </ sti // i /> } @ S <| G
+
+
+    </ xi : Ti // i /> |> t : T <| </ xi : Ti' // i />
+    ---------------------------------------------------------------------------- :: fun_def
+    G |> \ ( </ xi : Ti >> Ti' // i />) . t : ( </ Ti >> Ti' // i /> ) -> T <| G
+
+
+    x notin G
+    G |> t' : T' <| G'
+    G' , x : T' |> t : T <| G'' , x : T''
+    --------------- :: let
+    G |> let x = t' in t : T <| G''
+
+
+    G |> t : T' <| G'
+    --------------------------------------- :: update
+    G , x : T |> x := t : Unit <| G' , x : T'
+
+
+    G |> t : T <| G'
+    G' |> t' : T' <| G''
+    ----------------------- :: seq
+    G |> t ; t' : T' <| G''
+
+  
+    G ( x ) = ( </ Ui >> Ti' // i /> ) -> T
+    Ti <: Ui
+    ---------------------------------------------------------------------------- :: fun_call
+    G , </ xi : Ti // i /> |> x ( </ xi // i /> ) : T <| G, </ xi : Ti' // i />
+
+
+    Meth ( O @ S . m )
+    Next ( O @ S . m ) = S'
+    RType ( O @ S . m ) = T
+    -------------------------------------------- :: meth_call
+    G , x : O @ S |> x . m : T <| G , x : O @ S'
+
+
+    G  |> t1 : Bool <| G1
+    G1 |> t2 : T2 <| G2
+    G1 |> t3 : T3 <| G3
+    G2 join G3 = G4
+    T2 join T3 = T
+    -------------------------------------- :: if
+    G |> if t1 then t2 else t3 : T <| G4
+
+
+    G |> t : T <| G' , G''
+    ---------------------- :: drop
+    G |> t : T <| G'
+
+    T <: U
+    G |> t : T <| G'
+    ---------------------- :: sub
+    G |> t : U <| G'
+
+    T <: U
+    G |> t : T <| G', x : T
+    ------------------------ :: sub_ctx
+    G |> t : T <| G', x : U

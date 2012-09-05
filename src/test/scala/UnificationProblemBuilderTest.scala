@@ -1,7 +1,7 @@
 /*
- * This file is part of TS0.
+ * This file is part of TS.
  * 
- * TS0 - Copyright (c) 2012, Iain McGinniss
+ * TS - Copyright (c) 2012, Iain McGinniss
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -9,7 +9,7 @@
  * http://opensource.org/licenses/BSD-2-Clause
  */
 
-package uk.ac.gla.dcs.ts0
+package uk.ac.gla.dcs.ts
 
 import scala.collection.mutable.Queue
 

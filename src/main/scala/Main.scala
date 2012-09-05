@@ -1,7 +1,7 @@
 /*
- * This file is part of TS0.
+ * This file is part of TS.
  * 
- * TS0 - Copyright (c) 2012, Iain McGinniss
+ * TS - Copyright (c) 2012, Iain McGinniss
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -9,7 +9,7 @@
  * http://opensource.org/licenses/BSD-2-Clause
  */
 
-package uk.ac.gla.dcs.ts0
+package uk.ac.gla.dcs.ts
 
 import org.kiama.util.Console
 import org.kiama.util.Emitter
@@ -28,7 +28,7 @@ object Driver extends ParsingREPL[Term] with Parser {
     if(!args.contains("-debug")) {
       disableLogging()
     }
-    println("TS0 REPL - press CTRL+D to exit. Type single-line terms for type analysis")
+    println("TS REPL - press CTRL+D to exit. Type single-line terms for type analysis")
     super.main(args)
   }
 

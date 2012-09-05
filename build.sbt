@@ -1,10 +1,10 @@
 import AssemblyKeys._
 
-name := "ts0"
+name := "ts"
 
 organization := "uk.ac.gla.dcs"
 
-version := "0"
+version := "1"
 
 resolvers ++= Seq( 
   "Sonatype OSS" at "https://oss.sonatype.org/content/repositories/releases/",
@@ -30,4 +30,4 @@ addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.8.3")
 
 assemblySettings
 
-mainClass in assembly := Some("uk.ac.gla.dcs.ts0.Driver")
+mainClass in assembly := Some("uk.ac.gla.dcs.ts.Driver")
