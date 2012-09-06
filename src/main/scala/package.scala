@@ -27,6 +27,39 @@ package object ts {
   /** A typing context, which consists of variable names mapped to types */
   type Context = Map[String,Type]
 
+  sealed abstract class JoinError
+  case class DifferentDomains(leftDiff : Set[String], rightDiff : Set[String])
+    extends JoinError
+  case class MismatchedTypes(varName : String, t1 : Type, t2 : Type)
+    extends JoinError
+
+  def joinContexts(c1 : Context, c2 : Context) : Either[Seq[JoinError],Context] = {
+    if(c1.keySet != c2.keySet) {
+      val c1Extra = c1.keySet -- c2.keySet
+      val c2Extra = c2.keySet -- c1.keySet
+      Left(Seq(DifferentDomains(c1Extra, c2Extra)))
+    }
+
+    val (errors, ctx) = (c1.foldLeft
+      (Pair(Seq.empty[JoinError], emptyContext))
+      ((res, p) => {
+        val errors = res._1
+        val ctx = res._2
+        val varName = p._1
+        val varType = p._2
+        val otherType = c2(varName)
+
+        (varType.join(otherType).
+          map(joinedType => Pair(errors, ctx + (varName -> joinedType))).
+          getOrElse(Pair(MismatchedTypes(varName, varType, otherType) +: errors, 
+            ctx))
+        )
+      })
+    )
+
+    if(errors.isEmpty) Right(ctx) else Left(errors)
+  }
+
   /** A typing context, where variables are mapped to type expressions
    *  rather than concrete types, i.e. type variables may be involved
    */

@@ -17,13 +17,16 @@ import grizzled.slf4j.Logger
 object TypeUtil {
 
   val UNIT_LABEL = 0
-  val FUN_LABEL = 1
-  val OBJ_LABEL = 2
+  val BOOL_LABEL = 1
+  val FUN_LABEL = 2
+  val OBJ_LABEL = 3
 
   def labelForType(x : Type) = x match {
     case _ : UnitType => UNIT_LABEL
+    case _ : BoolType => BOOL_LABEL
     case _ : FunType => FUN_LABEL
     case _ : ObjType => OBJ_LABEL
+    case _ => throw new IllegalArgumentException("invalid type for unification")
   }
 }
 

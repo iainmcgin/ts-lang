@@ -21,14 +21,16 @@ trait Parser extends org.kiama.util.PositionedParserUtilities {
 
   lazy val subterm : PackratParser[Term] =
     "(" ~> term <~ ")" |
-    (ident <~ "(") ~ repsep(ident, ",") <~ ")"                  ^^ FunCall |
-    (ident <~ ".") ~ ident                                      ^^ MethCall |
-    ("if" ~> subterm) ~ ("then" ~> subterm) ~ ("else" ~> term)  ^^ If |
+    (ident <~ "(") ~ repsep(ident, ",") <~ ")"                    ^^ FunCall |
+    (ident <~ ".") ~ ident                                        ^^ MethCall |
+    ("if" ~> subterm) ~ ("then" ~> subterm) ~ ("else" ~> subterm) ^^ If |
     value
 
   lazy val value : PackratParser[Value] =
-    "unit" ^^ (_ => UnitValue()) |
-    ("[" ~> rep1(statedef) <~ "]" <~ "@") ~ ident ^^ ObjValue |
+    "unit"                                            ^^ (_ => UnitValue()) |
+    "true"                                            ^^ (_ => TrueValue()) |
+    "false"                                          ^^ (_ => FalseValue()) |
+    ("[" ~> rep1(statedef) <~ "]" <~ "@") ~ ident               ^^ ObjValue |
     ("\\" ~> "(" ~> repsep(paramdef, ",") <~ ")" <~ ".") ~ term ^^ FunValue
 
   lazy val statedef : PackratParser[StateDef] =

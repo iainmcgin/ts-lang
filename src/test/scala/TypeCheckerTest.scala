@@ -21,12 +21,16 @@ class TypeCheckerTest extends FunSuite with ShouldMatchers {
   import org.kiama.util.Messaging._
 
   def checkType(t : Term, expectedType : Type) = {
+    resetmessages
     TypeChecker.check(t)
     assert(t->ttype === expectedType)
-    assert(messagecount === 0)
+    if(messagecount > 0) {
+      fail("error messages reported:\n" + messages.mkString("\n"))
+    }
   }
 
-  def checkInvalid(t : Term, expectedErrors : Seq[String]) = {
+  def checkInvalid(t : Term, expectedErrors : String*) = {
+    resetmessages
     TypeChecker.check(t)
     messagecount should be (expectedErrors.size)
 
@@ -41,8 +45,16 @@ class TypeCheckerTest extends FunSuite with ShouldMatchers {
 
   val empty = Map.empty[String,Type]
 
-  test("unit term type") {
+  test("unit value type") {
     checkType(unitv, unitt)
+  }
+
+  test("true value type") {
+    checkType(truev, boolt)
+  }
+
+  test("false value type") {
+    checkType(falsev, boolt)
   }
 
   test("function term type no params") {
@@ -94,8 +106,46 @@ class TypeCheckerTest extends FunSuite with ShouldMatchers {
     val letFun = LetBind("f", fun, letParam)
 
     checkInvalid(letFun, 
-      Seq("parameter x is not of the required type for function f: expected " 
-        + funt(unitt) + ", but found " + unitt)
+      "parameter x is not of the required type for function f: expected " 
+        + funt(unitt) + ", but found " + unitt
     )
+  }
+
+  test("if-then-else with true value branches") {
+    val ift = If(truev, truev, truev)
+    checkType(ift, boolt)
+  }
+
+  test("if-then-else which changes variables") {
+    val ift = If(truev, "x" := truev, "x" := falsev)
+    val let = LetBind("x", unitv, ift)
+
+    checkType(let, unitt)
+    assert(ift->ttype === unitt)
+    assert(ift.whenTrue->output === Map("x" -> boolt))
+    assert(ift.whenFalse->output === Map("x" -> boolt))
+    assert(ift->output === Map("x" -> boolt))
+  }
+
+  test("if-then-else with incompatible variable changes") {
+    val ift = If(truev, 
+      seq("x" := falsev, "y" := unitv), 
+      seq("x" := unitv, "y" := truev)
+    )
+    val let1 = LetBind("x", unitv, ift)
+    val let2 = LetBind("y", unitv, let1)
+
+    checkInvalid(let2,
+      "variable x has incompatible types in the output of the branches: " +
+      "Bool and Unit",
+      "variable y has incompatible types in the output of the branches: " +
+      "Unit and Bool")
+  }
+
+  test("if-then-else with incompatible result types") {
+    val ift = If(truev, unitv, truev)
+
+    checkInvalid(ift,
+      "result types of branches are incompatible: Unit and Bool")
   }
 }

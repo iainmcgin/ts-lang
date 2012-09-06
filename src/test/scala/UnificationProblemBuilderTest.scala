@@ -69,7 +69,7 @@ class UnificationProblemBuilderTest extends FunSuite with ShouldMatchers {
     eqs should contain (
       MultiEquation(0, 
         vset(0, 1),
-        Some(MultiTerm(1, List(
+        Some(MultiTerm(TypeUtil.FUN_LABEL, List(
           TempMultiEquation(vset(2), Some(unitMT)),
           TempMultiEquation(vset(3), Some(unitMT)),
           TempMultiEquation(vset(4, 5), None)

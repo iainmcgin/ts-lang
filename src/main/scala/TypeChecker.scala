@@ -82,7 +82,11 @@ object TypeChecker {
    */
   val ttype : Term => Type =
     attr {
+      /* values */
       case UnitValue() => UnitType()
+      case TrueValue() => BoolType()
+      case FalseValue() => BoolType()
+      case ErrorValue() => ErrorType()
       case o @ ObjValue(states,state) => {
         val objErrors = o->objectErrors
         if(objErrors.isEmpty) {
@@ -95,6 +99,8 @@ object TypeChecker {
       }
       case FunValue(params,body) => 
         FunType(params.map(_->pEffect), body->ttype)
+
+      /* terms */
       case LetBind(_,_,body) => body->ttype
       case Update(_,_) => UnitType()
       case Sequence(l,r) => r->ttype
@@ -108,7 +114,15 @@ object TypeChecker {
           case FunType(_,retType) => retType
           case _ => ErrorType()
         }
-      case ErrorValue() => ErrorType()
+      case t @ If(cond,thn,els) => {
+        val t1 = thn->ttype
+        val t2 = els->ttype
+        t1.join(t2).getOrElse {
+          message(t, "result types of branches are incompatible: %s and %s".
+            format(t1, t2))
+          ErrorType()
+        }
+      }
     }
 
   /** 
@@ -135,6 +149,10 @@ object TypeChecker {
         }
         case p @ Sequence(left, right) => 
           (if (t eq left) p->input else p.left->output)
+        case p @ If(cond, thn, els) => {
+          if(t eq cond) p->input
+          else cond->output
+        }
         case p if p != null && p.isRoot => {
           emptyContext
         }
@@ -161,7 +179,8 @@ object TypeChecker {
       case Update(varName,body) => body->output + Pair(varName, body->ttype)
       case t @ MethCall(objName,methName) => methCallOutput(t)
       case Sequence(l,r) => r->output
-      case t @ FunCall(funName,params) => funCallOutput(t)
+      case t : FunCall => funCallOutput(t)
+      case t : If => ifOutput(t)
     } 
 
   def methCallOutput(t : MethCall) : Context = {
@@ -236,9 +255,35 @@ object TypeChecker {
     (t->input -- t.paramNames) ++ (t.paramNames zip newParamTypes)
   }
 
-  def check(t : Term) {
+  def ifOutput(t : If) = {
+    joinContexts(t.whenTrue->output, t.whenFalse->output) match {
+      case Left(errors) => {
+        errors.foreach(err => {
+          message(t, err match {
+            case DifferentDomains(_, _) =>
+              "output domains differ"
+            case MismatchedTypes(varName, t1, t2) =>
+              ("variable %s has incompatible types in the output of " +
+              "the branches: %s and %s") format (varName, t1, t2)
+          })
+        })
+        (t.whenTrue->output).mapValues(_ => ErrorType())
+      }
+      case Right(ctx) => ctx
+    }
+
+  }
+
+  def check(t : Term) : Boolean = {
     org.kiama.attribution.Attribution.initTree(t)
+    // force evaluation of the term's type and output context
+    // this should elicit all type errors
+    t->ttype
     t->output
+
+    // success is then gauged on whether any error messages were
+    // reported
+    (messagecount == 0)
   }
 }
 
@@ -273,6 +318,12 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
     val (doc, terms) = t match {
       case UnitValue() => 
         Pair(UNIT, Seq.empty)
+      case TrueValue() =>
+        Pair(TRUE, Seq.empty)
+      case FalseValue() =>
+        Pair(FALSE, Seq.empty)
+      case ErrorValue() =>
+        Pair(ERROR, Seq.empty)
       case ObjValue(states, state) => {
         val sDocs = states map (showStateDef _)
         val objBody = nest(lsep(sDocs, space))
@@ -305,9 +356,14 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
         val rightTermId = right->termId
         Pair(leftTermId <> ";" </> rightTermId, Seq(left, right))
       }
-        
       case FunCall(funName, paramNames) => 
         Pair(funName <> parens(lsep(paramNames map (text _), ",")), Seq.empty)
+      case If(cond, thn, els) =>
+        val condId = cond->termId
+        val thnTermId = thn->termId
+        val elsTermId = els->termId
+        Pair("if" <+> condId <+> "then" <+> thnTermId <+> "else" <+> elsTermId,
+          Seq(cond, thn, els))
     }
     val termWithType = doc <+> ":" <+> TYPE(showType(t->ttype))
     val tidDoc = tid <> ":"
@@ -339,6 +395,7 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
   def showType(t : Type) : Doc =
   t match {
     case UnitType() => "Unit"
+    case BoolType() => "Bool"
     case FunType(params, ret) => {
       val pDocs = params map showEffect
       parens(ssep(pDocs, ",")) <+> "->" <+> showType(ret)
@@ -403,6 +460,9 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
   val TYPE : Doc => Doc = color(Console.CYAN)
 
   val UNIT = VALUE("unit")
+  val TRUE = VALUE("true")
+  val FALSE = VALUE("false")
+  val ERROR = VALUE("error")
   val LET = KEYWORD("let")
   val IN = KEYWORD("in")
 }

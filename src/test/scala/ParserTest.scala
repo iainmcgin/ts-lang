@@ -84,4 +84,22 @@ class ParserTest extends FunSuite {
       seq(unitv, unitv, unitv)
     )
   }
+
+  test("parse true literal") {
+    checkTerm("true", truev)
+  }
+
+  test("parse false literal") {
+    checkTerm("false", falsev)
+  }
+
+  test("parse simple if-then-else") {
+    checkTerm("if true then unit else unit", If(truev, unitv, unitv))
+  }
+
+  test("parse if-then-else with sequences in branches") {
+    checkTerm("if true then (x := unit; y := unit) else (y := unit; x := unit)",
+      If(truev, seq("x" := unitv, "y" := unitv), seq("y" := unitv, "x" := unitv))
+    )
+  }
 }

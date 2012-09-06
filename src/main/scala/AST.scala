@@ -18,10 +18,12 @@ trait SourceElement extends Attributable with Positioned
 
 /* terms */
 
-abstract class Term extends SourceElement
-abstract class Value extends Term
+sealed abstract class Term extends SourceElement
+sealed abstract class Value extends Term
 
 case class UnitValue() extends Value
+case class TrueValue() extends Value
+case class FalseValue() extends Value
 case class ObjValue(states : Seq[StateDef], state : String) extends Value {
   val stateMap =
     (states.foldLeft
@@ -60,13 +62,29 @@ case class MissingState(
 
 /* types */
 
-abstract class Type extends Attributable {
+sealed abstract class Type extends Attributable {
   def >>(outType : Type) = EffectType(this, outType)
+  def join(other : Type) : Option[Type] = (this, other) match {
+    case (UnitType(), UnitType()) => Some(UnitType())
+    case (BoolType(), BoolType()) => Some(BoolType())
+    case (FunType(f1p, f1r), FunType(f2p, f2r)) =>
+      // TODO: join of function types
+      Some(UnitType())
+    case (ObjType(o1states, o1current), ObjType(o2states, o2current)) =>
+      // TODO: join of object types
+      Some(UnitType())
+    case (ErrorType(),_) => Some(ErrorType())
+    case (_, ErrorType()) => Some(ErrorType())
+    case _ => None
+  }
 }
 
 case class UnitType() extends Type {
   override def toString = "Unit"
-  val label = 1
+}
+
+case class BoolType() extends Type {
+  override def toString = "Bool"
 }
 
 case class FunType(params : Seq[EffectType], ret : Type) extends Type {
