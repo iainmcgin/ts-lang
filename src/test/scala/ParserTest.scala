@@ -16,50 +16,42 @@ import org.scalatest.FunSuite
 /**
  * Non-exhaustive set of sanity check tests for the TS language parser.
  */
-class ParserTest extends FunSuite with Parser {
+class ParserTest extends FunSuite {
 
-  def parseTerm(termStr : String) = parseString(term, termStr)
+  import TestUtils._
+
   def checkTerm(termStr : String, expected : Term) = 
-    assert(parseTerm(termStr) === Left(expected))
+    assert(parse(termStr) === Left(expected))
 
 	test("parse unit value") {
-		checkTerm("unit", UnitValue())
+		checkTerm("unit", unitv)
 	}
 
   test("parse zero argument function") {
-    checkTerm("\\().unit", FunValue(Seq(), UnitValue()))
+    checkTerm("\\().unit", funv(unitv))
   }
 
   test("parse multi argument (no types) function") {
     checkTerm(
       "\\(x,y).unit",
-      FunValue(
-        Seq(ParamDef("x", None), ParamDef("y", None)), 
-        UnitValue()
-        )
-      )
+      funv(unitv, p("x"), p("y"))
+    )
   }
 
   test("parse function with typed argument") {
     checkTerm(
       "\\(x : Unit >> Unit).unit",
-      FunValue(
-        Seq(ParamDef("x", Some(EffectType(UnitType(), UnitType())))),
-        UnitValue()
-        )
-      )
+      funv(unitv, p("x", unitt >> unitt))
+    )
   }
 
   test("parse function with object type argument") {
     val objType = 
-      ObjType(Seq(StateSpec("S", Seq(MethodSpec("a", UnitType(), "S")))), "S")
+      ObjType(Seq(StateSpec("S", Seq(MethodSpec("a", unitt, "S")))), "S")
 
     checkTerm(
       "\\(x : {S{a : Unit >> S}}@S >> {S{a : Unit >> S}}@S).unit",
-      FunValue(
-        Seq(ParamDef("x", Some(EffectType(objType, objType)))), 
-        UnitValue()
-      )
+      funv(unitv, p("x", objType >> objType))
     )
   }
 
@@ -78,8 +70,8 @@ class ParserTest extends FunSuite with Parser {
       "[ A{ a=(unit,B) } B { b=(unit,A) } ]@A",
       ObjValue(
         Seq(
-          StateDef("A", Seq(MethodDef("a", UnitValue(), "B"))),
-          StateDef("B", Seq(MethodDef("b", UnitValue(), "A")))
+          StateDef("A", Seq(MethodDef("a", unitv, "B"))),
+          StateDef("B", Seq(MethodDef("b", unitv, "A")))
           ),
         "A"
         )
@@ -89,13 +81,7 @@ class ParserTest extends FunSuite with Parser {
   test("parse triple sequence") {
     checkTerm(
       "unit; unit; unit",
-      Sequence(
-        UnitValue(),
-        Sequence(
-          UnitValue(),
-          UnitValue()
-          )
-        )
+      seq(unitv, unitv, unitv)
     )
   }
 }
