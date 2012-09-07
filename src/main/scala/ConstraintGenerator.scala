@@ -86,6 +86,8 @@ object ConstraintGenerator {
     (t->constraints) ++ 
     (t match {
       case UnitValue() => ConstraintSet()
+      case TrueValue() => ConstraintSet()
+      case FalseValue() => ConstraintSet()
       case o @ ObjValue(states,_) => methodConstraints(o)
       case FunValue(_,body) => allConstraints(body)
       case LetBind(_,value,body) => 
@@ -95,6 +97,8 @@ object ConstraintGenerator {
       case Sequence(left, right) => 
         allConstraints(left) ++ allConstraints(right)
       case FunCall(_,_) => ConstraintSet()
+      case If(cond,thn,els) => 
+        allConstraints(cond) ++ allConstraints(thn) ++ allConstraints(els)
     })
 
   def methodConstraints(o : ObjValue) =
@@ -120,21 +124,28 @@ object ConstraintGenerator {
 
   val constraints : Term => ConstraintSet =
     attr {
-      case t : UnitValue => unitValueConstraints(t)
-      case t : ObjValue  => objectValueConstraints(t)
-      case t : FunValue  => funValueConstraints(t)
-      case t : LetBind   => letBindConstraints(t)
-      case t : Update    => updateConstraints(t)
-      case t : Sequence  => sequenceConstraints(t)
-      case t : FunCall   => funCallConstraint(t)
-      case t : MethCall  => methCallConstraint(t)
+      case t : UnitValue  => unitValueConstraints(t)
+      case t : TrueValue  => boolValueConstraints(t)
+      case t : FalseValue => boolValueConstraints(t)
+      case t : ObjValue   => objectValueConstraints(t)
+      case t : FunValue   => funValueConstraints(t)
+      case t : LetBind    => letBindConstraints(t)
+      case t : Update     => updateConstraints(t)
+      case t : Sequence   => sequenceConstraints(t)
+      case t : FunCall    => funCallConstraint(t)
+      case t : MethCall   => methCallConstraint(t)
+      case t : If         => ifConstraints(t)
     }
 
   def unitValueConstraints(t : UnitValue) =
     (ConstraintSet() +
       TypeExprConstraint(VarTE(t->typeVar), UnitTE) +
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)))
-    
+  
+  def boolValueConstraints(t : Term) =
+    (ConstraintSet() +
+      TypeExprConstraint(VarTE(t->typeVar), BoolTE) +
+      ContextConstraint(t->outContextVar, sameAs(t->inContextVar)))
 
   def objectValueConstraints(t : ObjValue) = {
     (ConstraintSet() +
@@ -278,6 +289,17 @@ object ConstraintGenerator {
         ModifiedContext(t->inContextVar, Map(t.objVarName -> outObjectType)))
     )
   }
+
+  def ifConstraints(t : If) =
+    (ConstraintSet() +
+      TypeExprConstraint(VarTE(t.condition->typeVar), BoolTE) +
+      SubtypeConstraint(VarTE(t.whenTrue->typeVar), VarTE(t->typeVar)) +
+      SubtypeConstraint(VarTE(t.whenFalse->typeVar), VarTE(t->typeVar)) +
+      ContextConstraint(t.condition->inContextVar, sameAs(t->inContextVar)) +
+      ContextConstraint(t.whenTrue->inContextVar, sameAs(t.condition->outContextVar)) +
+      ContextConstraint(t.whenFalse->inContextVar, sameAs(t.condition->outContextVar)) +
+      ContextConstraint(t->outContextVar,
+        ContextJoin(t.whenTrue->outContextVar, t.whenFalse->outContextVar)))
 
   def buildEffects(in : Seq[(String,TypeExpr)], out : Seq[(String,TypeExpr)]) =
     in.zip(out).map(x => EffectTE(x._1._2, x._2._2))

@@ -18,6 +18,7 @@ import grizzled.slf4j.Logger
 
 case class BadRootContextDef(contextDef : ContextDefinition) extends Exception
 case class UnresolvedDependency(contextDef : ContextDefinition) extends Exception
+case class CannotJoinContexts(contextDef : ContextDefinition) extends Exception
 case class MissingVariable(base : ContextVar, varName : String) 
   extends Exception("context " + base + " does not contain variable " + varName)
 case class DuplicateDefinition(base : ContextVar, varName : String) extends Exception
@@ -126,31 +127,50 @@ class ConstraintSolver(t : Term) {
         ((m, c) => m.updated(c.context, c +: m.getOrElse(c.context, Seq.empty)))
       )
 
-    val (roots, dependencies) =
+    var dependencies =
       (ccs.foldLeft
-        (Pair(Map.empty[ContextVar, ContextConstraint], 
-              Map.empty[ContextVar, Set[ContextConstraint]]))
-        ((result, c) => c.definedAs match {
-          case cwd : ContextWithDependency => {
-            val (roots, deps) = result
-            val amendedDeps = deps.getOrElse(cwd.base, Set.empty) + c
-            (roots, deps.updated(cwd.base, amendedDeps))
-          }
-          case bc : BaseContext => {
-            val (roots, deps) = result
-            (roots + (c.context -> c), deps)
+        (Map.empty[ContextVar, Set[ContextVar]])
+        ((deps, c) => {
+          c.definedAs match {
+            case cwd : ContextWithDependency => {
+              deps.updated(cwd.base, 
+                deps.getOrElse(cwd.base, Set.empty) + c.context)
+            }
+            case cj : ContextJoin => {
+              (deps.
+                updated(cj.left, deps.getOrElse(cj.left, Set.empty) + c.context).
+                updated(cj.left, deps.getOrElse(cj.right, Set.empty) + c.context))
+            }
+            case bc : BaseContext => {
+              deps
+            }
           }
         })
       )
 
+    var inCount =
+      (ccById.keySet.foldLeft
+        (Map.empty[ContextVar, Int])
+        ((inCount, contextVar) => {
+          val inCount2 = 
+            (dependencies.getOrElse(contextVar, Set.empty).foldLeft
+              (inCount)
+              ((inCount, dep) => 
+                inCount.updated(dep, inCount.getOrElse(dep, 0) + 1)
+              )
+            )
+          inCount2.updated(contextVar, inCount2.getOrElse(contextVar, 0))
+        })
+      )
+
     // we are guaranteed from the way context constraints are constructed
-    // that the dependency graph is a forest. Solve all constraints from
+    // that the dependency graph is acyclic. Solve all constraints from
     // the roots to leaves
 
     var contexts = Map.empty[ContextVar, SolvedContext]
     var transRoots = Map.empty[ContextVar, ContextVar]
 
-    var available : Set[ContextVar] = roots.keySet
+    var available : Set[ContextVar] = inCount.filter(_._2 == 0).keySet
     while(!available.isEmpty) {
       val next = available.head
 
@@ -168,10 +188,21 @@ class ConstraintSolver(t : Term) {
         )
       
       val tail : Set[ContextVar] = available.tail
-      val depCcs = dependencies.getOrElse(next, Set.empty[ContextConstraint])
-      val depCtxs = depCcs.map(_.context)
-      available = depCtxs ++ tail
+      val depCtxs : Set[ContextVar] = dependencies.getOrElse(next, Set.empty[ContextVar])
+
+      val newlyAvailable = (depCtxs.foldLeft
+        (Set.empty[ContextVar])
+        ((s, dep) => {
+          val newCount = inCount.getOrElse(dep, 1) - 1
+          inCount = inCount.updated(dep, newCount)
+          if (newCount <= 0) s + dep else s
+        })
+      )
+
+      available = newlyAvailable ++ tail
     }
+
+    if(inCount.exists(_._2 > 0)) throw new RuntimeException("leftovers: " + inCount.filter(_._2 > 0))
 
     contexts.mapValues(sc => sc.contents)
   }
@@ -197,6 +228,24 @@ class ConstraintSolver(t : Term) {
             val transRoots2 = transRoots + (cc.context -> transRoots(cd.base))
             (contexts2, transRoots2)
           }
+        }
+      case cj : ContextJoin =>
+        (contexts.get(cj.left), contexts.get(cj.right)) match {
+          case (Some(left), Some(right)) => {
+            joinPolyContexts(left.contents, right.contents) match {
+              case Left(errs) =>
+                throw new CannotJoinContexts(cj)
+              case Right(ctx) => {
+                val contexts2 = contexts + 
+                  (cc.context -> SolvedContext(ctx, false))
+                val transRoots2 = transRoots + 
+                  (cc.context -> transRoots(cj.left))
+                (contexts2, transRoots2)
+              }
+            }
+            
+          }
+          case _ => throw new UnresolvedDependency(cj)
         }
     }
   }
@@ -355,14 +404,14 @@ class ConstraintSolver(t : Term) {
   }
 
   def unifyTypes(constraints : Seq[TypeExprConstraint]) : Option[Map[TypeVar, TypeExpr]] = {
-    val sys = UnificationProblemBuilder.build(constraints :_*)
     try {
+      val sys = UnificationProblemBuilder.build(constraints :_*)
       val solvedEqs : List[MultiEquation] = Unifier.unify(sys)
       log.debug("solvedEqs: " + solvedEqs)
       Some(SolutionExtractor.extract(solvedEqs))
     } catch {
       case e => {
-        log.debug("solution failed: " + e)
+        log.debug("cannot solve constraints: " + e)
         None
       }
     }
@@ -383,21 +432,12 @@ class ConstraintSolver(t : Term) {
         stateVar = toCanonicalVar(c.stateVar, varsToTypeExprs),
         nextState = toCanonicalVar(c.nextState, varsToTypeExprs)))
 
-    val initState = (stateVar : TypeVar) => StateTE(stateVar, Seq.empty)
-
     // TODO: is it necessary to drill into the TypeExpr structure to find
     // embedded ObjectTE instances too?
     val knownObjectStates = 
-      (varsToTypeExprs.foldLeft
-        (Map.empty[TypeVar, Map[TypeVar, StateTE]])
-        ((m, p) => p._2 match {
-          case ObjectTE(objVar, stVar) => {
-            val states = m.getOrElse(objVar, Map.empty)
-            m.updated(objVar, states + (stVar -> initState(stVar)))
-          }
-          case _ => m
-        })
-      )
+      extractStatesFromConstraints(
+        extractStatesFromVarMap(varsToTypeExprs),
+        updatedConstraints)
 
     log.debug("knownObjectStates = " + knownObjectStates)
 
@@ -409,7 +449,7 @@ class ConstraintSolver(t : Term) {
           val method = MethodTE(c.method, c.retType, c.nextState)
           log.debug("processing " + method)
           val obj = m.get(c.objVar).getOrElse(Map.empty[TypeVar, StateTE])
-          val state = obj.getOrElse(c.stateVar, initState(c.stateVar))
+          val state = obj.getOrElse(c.stateVar, StateTE(c.stateVar))
           // TODO: check if method already exists, if so, further
           // constraint solving may be necessary?
           val updatedState = state.copy(methods = method +: state.methods)
@@ -428,6 +468,35 @@ class ConstraintSolver(t : Term) {
       })
     })
   }
+
+  def extractStatesFromVarMap(varsToTypeExprs : Map[TypeVar, TypeExpr])
+    : Map[TypeVar, Map[TypeVar, StateTE]] =
+    (varsToTypeExprs.foldLeft
+        (Map.empty[TypeVar, Map[TypeVar, StateTE]])
+        ((m, p) => p._2 match {
+          case ObjectTE(objVar, stVar) => {
+            val states = m.getOrElse(objVar, Map.empty)
+            m.updated(objVar, states + (stVar -> StateTE(stVar)))
+          }
+          case _ => m
+        })
+      )
+
+  def extractStatesFromConstraints(
+    stateMap : Map[TypeVar, Map[TypeVar, StateTE]],
+    constraints : Seq[MethodConstraint])
+    : Map[TypeVar, Map[TypeVar, StateTE]] =
+    (constraints.foldLeft
+      (stateMap)
+      ((m, c) => {
+        val states = m.getOrElse(c.objVar, Map.empty)
+        val inState = 
+          c.stateVar -> states.getOrElse(c.stateVar, StateTE(c.stateVar))
+        val outState = 
+          c.nextState -> states.getOrElse(c.nextState, StateTE(c.nextState))
+        m.updated(c.objVar, states + inState + outState)
+      })
+    )
 
   /**
    * Substitutes the known type expression for every type variable in the
@@ -480,6 +549,7 @@ class ConstraintSolver(t : Term) {
         case None => Pair(Set(tv), VarTE(tv))
       }
       case UnitTE => Pair(Set.empty, UnitTE)
+      case BoolTE => Pair(Set.empty, BoolTE)
       case FunTE(effects, ret) => {
         val (effVars, effElim) = 
           (effects.foldRight
@@ -520,6 +590,7 @@ class ConstraintSolver(t : Term) {
       te match {
         case VarTE(tv) => substitution(tv)
         case UnitTE => UnitType()
+        case BoolTE => BoolType()
         case FunTE(effects, ret) => 
           FunType(
             effects.map(e => 

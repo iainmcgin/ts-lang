@@ -67,14 +67,53 @@ sealed abstract class Type extends Attributable {
   def join(other : Type) : Option[Type] = (this, other) match {
     case (UnitType(), UnitType()) => Some(UnitType())
     case (BoolType(), BoolType()) => Some(BoolType())
-    case (FunType(f1p, f1r), FunType(f2p, f2r)) =>
-      // TODO: join of function types
-      Some(UnitType())
-    case (ObjType(o1states, o1current), ObjType(o2states, o2current)) =>
-      // TODO: join of object types
-      Some(UnitType())
+    case (FunType(f1p, f1r), FunType(f2p, f2r)) => {
+      if(f1p.size != f2p.size) None
+      else {
+        val retTypeOpt = f1r join f2r
+        val paramTypesOpt = (f1p.zip(f2p).foldRight
+          (Option(Seq.empty[EffectType]))
+          ((paramPair, resOpt) => resOpt.flatMap(res => {
+            val (eff1, eff2) = paramPair
+            (eff1 join eff2) map (_ +: res)
+          }))
+        )
+
+        paramTypesOpt.flatMap(p => retTypeOpt.map(r => FunType(p, r)))
+      }
+    }
+    case (a @ ObjType(_, _), b @ ObjType(_, _)) =>
+      a.joinObj(b)
     case (ErrorType(),_) => Some(ErrorType())
     case (_, ErrorType()) => Some(ErrorType())
+    case _ => None
+  }
+
+  def meet(other : Type) : Option[Type] = (this, other) match {
+    case (UnitType(), UnitType()) => Some(UnitType())
+    case (BoolType(), BoolType()) => Some(BoolType())
+    case (FunType(f1p, f1r), FunType(f2p, f2r)) => {
+      if(f1p.size != f2p.size) None
+      else {
+        val retTypeOpt = f1r meet f2r
+        val paramTypesOpt = (f1p.zip(f2p).foldRight
+          (Option(Seq.empty[EffectType]))
+          ((paramPair, resOpt) => resOpt.flatMap(res => {
+            val (eff1, eff2) = paramPair
+            (eff1 meet eff2) map (_ +: res)
+          }))
+        )
+
+        paramTypesOpt.flatMap(p => retTypeOpt.map(r => FunType(p, r)))
+      }
+    }
+
+    case (a @ ObjType(_,_), b @ ObjType(_,_)) => {
+      a.meetObj(b)
+    }
+
+    case (ErrorType(),_) => Some(ErrorType())
+    case (_,ErrorType()) => Some(ErrorType())
     case _ => None
   }
 }
@@ -104,6 +143,16 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
   def retType(method : String) = 
     currentState flatMap (s => s.retType(method)) getOrElse ErrorType()
 
+  def joinObj(other : ObjType) : Option[ObjType] = {
+    // TODO
+    None
+  }
+
+  def meetObj(other : ObjType) : Option[ObjType] = {
+    // TODO
+    None
+  }
+
   override def toString = "{ " + states.mkString(" ") + "}@" + state
 }
 
@@ -129,4 +178,16 @@ case class MethodSpec(name : String, ret : Type, nextState : String) {
 
 case class EffectType(before : Type, after : Type) {
   override def toString = before + " ≫ " + after
+
+  def join(other : EffectType) : Option[EffectType] = {
+    val beforeOpt = this.before meet other.before
+    val afterOpt = this.after join other.after
+    beforeOpt.flatMap(b => afterOpt.map(a => EffectType(b, a)))
+  }
+
+  def meet(other : EffectType) : Option[EffectType] = {
+    val beforeOpt = this.before join other.before
+    val afterOpt = this.after meet other.after
+    beforeOpt.flatMap(b => afterOpt.map(a => EffectType(b, a)))
+  }
 }

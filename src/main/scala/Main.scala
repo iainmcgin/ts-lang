@@ -82,6 +82,7 @@ object Driver extends ParsingREPL[Command] with REPLParser {
 
   def infer(debug : Boolean, t : Term) {
     resetmessages
+    org.kiama.attribution.Attribution.initTree(t)
     val constraints = ConstraintGenerator.generateConstraints(t)
     println("constraints:\n" + constraints)
     if(debug) enableLogging()
@@ -92,10 +93,15 @@ object Driver extends ParsingREPL[Command] with REPLParser {
 
     if(messagecount > 0) report()
 
-    solutionOpt.foreach(soln => {
-      println("input context: " + soln._1)
-      println("type: " + soln._3)
-      println("output context: " + soln._4)
-    })
+    solutionOpt match {
+      case Some(soln) => {
+        println("input context: " + soln._1)
+        println("type: " + soln._3)
+        println("output context: " + soln._4)
+      }
+      case None => {
+        println("constraints have no solution - term is untypeable")
+      }
+    }
   }
 }

@@ -66,7 +66,7 @@ case class MethodConstraint(
     " ∈ " + objVar + "@" + stateVar
 }
 
-abstract class ContextDefinition
+sealed abstract class ContextDefinition
 
 trait ContextWithDependency extends ContextDefinition {
   val base : ContextVar
@@ -109,6 +109,12 @@ case class ContextRemoval(base : ContextVar, removedVar : String)
   override def toString = base + " - { " + removedVar + " }"
 }
 
+case class ContextJoin(left : ContextVar, right : ContextVar)
+  extends ContextDefinition {
+
+  override def toString = left + " ∨ " + right
+}
+
 /**
  * Specifies a context explicitly, with all known variable mappings
  * for that context. Used as the input context for a function body.
@@ -144,8 +150,14 @@ case class ConstraintSet(
 
   override def toString = {
     val sortedCcs = ccs.sortBy(_.context.v)
-
-    (sortedCcs ++ cvcs ++ tecs ++ scs ++ mcs).mkString("; ")
+    val typeCs = tecs ++ scs
+    ("context constraints:\n\t" +
+      (if (sortedCcs.isEmpty) "none" else sortedCcs.mkString("\n\t")) +
+      "\ntype constraints:\n\t" +
+      (if (typeCs.isEmpty) "none" else typeCs.mkString("\n\t")) +
+      "\nmethod constraints:\n\t" +
+      (if(mcs.isEmpty) "none" else mcs.mkString("\n\t"))
+    )
   }
 }
 

@@ -33,7 +33,7 @@ class TypeInferenceTest extends FunSuite with ShouldMatchers {
           log.debug(termStr)
           val constraints = ConstraintGenerator.generateConstraints(t)
           val soln = ConstraintSolver.solvePolymorphic(constraints, t)
-          log.debug("----")
+          log.debug("====")
 
           soln match {
             case None => fail("could not infer type of term")

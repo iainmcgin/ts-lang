@@ -20,6 +20,10 @@ case object UnitTE extends TypeExpr {
   override def toString = "Unit"
 }
 
+case object BoolTE extends TypeExpr {
+  override def toString = "Bool"
+}
+
 case class FunTE(params : Seq[EffectTE], ret : TypeExpr) extends TypeExpr {
   override def toString = "(" + params.mkString(",") + ") → " + ret
 }
@@ -37,7 +41,7 @@ case class SolvedObjectTE(
   override def toString = "{ " + states.mkString(" ") + " }@" + state
 }
 
-case class StateTE(nameVar : TypeVar, methods : Seq[MethodTE]) {
+case class StateTE(nameVar : TypeVar, methods : Seq[MethodTE] = Seq.empty) {
   override def toString = nameVar + "{ " + methods.mkString("; ") + " }"
 }
 

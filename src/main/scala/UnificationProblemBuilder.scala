@@ -166,6 +166,7 @@ class UnificationProblemBuilder {
   private def typeToMultiTerm(te : TypeExpr) : (MultiTerm,Set[TypeVar]) = {
     te match {
       case UnitTE => Pair(MultiTerm(TypeUtil.UNIT_LABEL, List.empty), Set.empty)
+      case BoolTE => Pair(MultiTerm(TypeUtil.BOOL_LABEL, List.empty), Set.empty)
       case FunTE(params, ret) => 
         val (retTempEq,retVars) = typeToTempEq(ret)
         val (effectEqs, effectVars) = effectsToTempEqs(params)
@@ -259,6 +260,7 @@ class SolutionExtractor(val eqs : List[MultiEquation]) {
   private def multiTermToType(mt : MultiTerm) : TypeExpr = {
     mt.fn match {
       case TypeUtil.UNIT_LABEL => UnitTE
+      case TypeUtil.BOOL_LABEL => BoolTE
       case TypeUtil.FUN_LABEL => {
         val argTypes = mt.args.map(arg => {
           if(!arg.s.isEmpty) {

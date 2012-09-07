@@ -65,6 +65,12 @@ package object ts {
    */
   type PolyContext = Map[String,TypeExpr]
 
+  def joinPolyContexts(c1 : PolyContext, c2 : PolyContext) 
+    : Either[Seq[JoinError], PolyContext] = {
+    // TODO
+    Right(c1)
+  }
+
   /** an empty context, which maps all variable names to ErrorType */
   val emptyContext : Context = Map.empty.withDefaultValue(ErrorType())
 
