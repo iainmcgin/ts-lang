@@ -27,7 +27,7 @@ class UnificationProblemBuilderTest extends FunSuite with ShouldMatchers {
     })
   }
 
-  def uniTest(cs : TypeExprConstraint*)(fn : Set[MultiEquation] => Unit) = 
+  def uniTest(cs : EqualityConstraint*)(fn : Set[MultiEquation] => Unit) = 
     test(cs.mkString(", ")) {
       val (eqs,upart) = 
         UnificationProblemBuilder.buildForTest(cs :_*)
@@ -37,7 +37,7 @@ class UnificationProblemBuilderTest extends FunSuite with ShouldMatchers {
       fn(eqs)
     }
 
-  def badTest(cs : TypeExprConstraint*) = 
+  def badTest(cs : EqualityConstraint*) = 
     test("bad: " + cs.mkString(", ")) {
       (evaluating { UnificationProblemBuilder.build(cs :_*) } 
         should produce [CannotUnifyMultiTerms])

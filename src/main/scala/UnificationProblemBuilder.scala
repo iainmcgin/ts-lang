@@ -31,13 +31,13 @@ object TypeUtil {
 }
 
 object UnificationProblemBuilder {
-  def build(varConstraints : TypeExprConstraint*) = {
+  def build(varConstraints : EqualityConstraint*) = {
     val builder = new UnificationProblemBuilder()
     val eqs = builder.build(varConstraints)
     System(List.empty, builder.buildUPart(eqs))
   }
 
-  def buildForTest(varConstraints : TypeExprConstraint*) = {
+  def buildForTest(varConstraints : EqualityConstraint*) = {
     val builder = new UnificationProblemBuilder()
     val eqs = builder.build(varConstraints)
     val upart = builder.buildUPart(eqs)
@@ -67,7 +67,7 @@ class UnificationProblemBuilder {
     UPart(zeroRefEqs.toList, eqs.size)
   }
 
-  def build(varConstraints : Seq[TypeExprConstraint]) : Set[MultiEquation] = {
+  def build(varConstraints : Seq[EqualityConstraint]) : Set[MultiEquation] = {
 
     val (eqsWithRefsByVariable, noVarEqs) = (varConstraints.foldLeft
       (Pair(Map.empty[TypeVar,EqWithRefs], List.empty[MultiEquation]))

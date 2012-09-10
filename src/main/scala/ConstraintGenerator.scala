@@ -139,18 +139,18 @@ object ConstraintGenerator {
 
   def unitValueConstraints(t : UnitValue) =
     (ConstraintSet() +
-      TypeExprConstraint(VarTE(t->typeVar), UnitTE) +
+      EqualityConstraint(VarTE(t->typeVar), UnitTE) +
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)))
   
   def boolValueConstraints(t : Term) =
     (ConstraintSet() +
-      TypeExprConstraint(VarTE(t->typeVar), BoolTE) +
+      EqualityConstraint(VarTE(t->typeVar), BoolTE) +
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)))
 
   def objectValueConstraints(t : ObjValue) = {
     (ConstraintSet() +
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)) +
-      TypeExprConstraint(
+      EqualityConstraint(
         VarTE(t->typeVar), createSolvedObject(t))
     )
   }
@@ -199,7 +199,7 @@ object ConstraintGenerator {
       ContextConstraint(t->outContextVar, sameAs(t->inContextVar)) +
       ContextConstraint(t.body->inContextVar, 
         BaseContext(Map(inTypeVars: _*), false)) +
-      TypeExprConstraint(VarTE(t->typeVar), funType))
+      EqualityConstraint(VarTE(t->typeVar), funType))
   }
 
   def letBindConstraints(t : LetBind) =
@@ -209,7 +209,7 @@ object ConstraintGenerator {
         addTo(t.value->outContextVar, t.varName, VarTE(t.value->typeVar))) +
       ContextConstraint(t->outContextVar, 
         ContextRemoval(t.body->outContextVar, t.varName)) +
-      TypeExprConstraint(VarTE(t->typeVar), VarTE(t.body->typeVar))
+      EqualityConstraint(VarTE(t->typeVar), VarTE(t.body->typeVar))
     )
 
   def updateConstraints(t : Update) = {
@@ -219,7 +219,7 @@ object ConstraintGenerator {
         removeFrom(t->inContextVar, t.varName)) +
       ContextConstraint(t->outContextVar, 
         addTo(t.body->outContextVar, t.varName, bodyType)) +
-      TypeExprConstraint(VarTE(t->typeVar), UnitTE)
+      EqualityConstraint(VarTE(t->typeVar), UnitTE)
     )
   }
 
@@ -228,7 +228,7 @@ object ConstraintGenerator {
       ContextConstraint(t.left->inContextVar, sameAs(t->inContextVar)) +
       ContextConstraint(t.right->inContextVar, sameAs(t.left->outContextVar)) +
       ContextConstraint(t->outContextVar, sameAs(t.right->outContextVar)) +
-      TypeExprConstraint(VarTE(t->typeVar), VarTE(t.right->typeVar))
+      EqualityConstraint(VarTE(t->typeVar), VarTE(t.right->typeVar))
     )
 
   def funCallConstraint(t : FunCall) = {
@@ -292,7 +292,7 @@ object ConstraintGenerator {
 
   def ifConstraints(t : If) =
     (ConstraintSet() +
-      TypeExprConstraint(VarTE(t.condition->typeVar), BoolTE) +
+      EqualityConstraint(VarTE(t.condition->typeVar), BoolTE) +
       SubtypeConstraint(VarTE(t.whenTrue->typeVar), VarTE(t->typeVar)) +
       SubtypeConstraint(VarTE(t.whenFalse->typeVar), VarTE(t->typeVar)) +
       ContextConstraint(t.condition->inContextVar, sameAs(t->inContextVar)) +

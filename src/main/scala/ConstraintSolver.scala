@@ -88,7 +88,7 @@ class ConstraintSolver(t : Term) {
     // algorithm is implemented that finds correct solutions that respect
     // subtyping
     val subtypeConstraints = 
-      (constraints.scs ++ extraScs).map(sc => TypeExprConstraint(sc.a, sc.b))
+      (constraints.scs ++ extraScs).map(sc => EqualityConstraint(sc.a, sc.b))
 
     val allTypeConstraints = 
       constraints.tecs ++ extraTypeConstraints ++ subtypeConstraints
@@ -397,7 +397,7 @@ class ConstraintSolver(t : Term) {
    */
   def matchTypes(
     contexts : Map[ContextVar, PolyContext], 
-    varConstraints : Seq[ContextVarConstraint]) : Seq[TypeExprConstraint] = {
+    varConstraints : Seq[ContextVarConstraint]) : Seq[EqualityConstraint] = {
 
     varConstraints.flatMap(v => {
       contexts(v.context).get(v.varName) match {
@@ -408,12 +408,12 @@ class ConstraintSolver(t : Term) {
         // an unbound variable.
         // TODO: handle this
         case None => Seq.empty
-        case Some(typeExpr) => Seq(TypeExprConstraint(v.typeExpr, typeExpr))
+        case Some(typeExpr) => Seq(EqualityConstraint(v.typeExpr, typeExpr))
       }
     })
   }
 
-  def unifyTypes(constraints : Seq[TypeExprConstraint]) : Option[Map[TypeVar, TypeExpr]] = {
+  def unifyTypes(constraints : Seq[EqualityConstraint]) : Option[Map[TypeVar, TypeExpr]] = {
     try {
       val sys = UnificationProblemBuilder.build(constraints :_*)
       val solvedEqs : List[MultiEquation] = Unifier.unify(sys)

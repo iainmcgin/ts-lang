@@ -52,7 +52,7 @@ case class MethodTE(name : String, ret : TypeExpr, next : TypeVar) {
 case class VarTE(typeVar : TypeVar) extends TypeExpr {
   override def toString = typeVar.toString
 
-  def =^=(equivTo : TypeExpr) = TypeExprConstraint(this, equivTo)
+  def =^=(equivTo : TypeExpr) = EqualityConstraint(this, equivTo)
 }
 
 case class EffectTE(in : TypeExpr, out : TypeExpr) {

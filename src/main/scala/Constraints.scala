@@ -16,7 +16,7 @@ sealed abstract class Constraint
 /** 
  * Represents evidence that a must be an equivalent type to b.
  */
-case class TypeExprConstraint(a : TypeExpr, b : TypeExpr) extends Constraint {
+case class EqualityConstraint(a : TypeExpr, b : TypeExpr) extends Constraint {
   override def toString = a + " = " + b
 }
 
@@ -129,13 +129,13 @@ case class BaseContext(vars : PolyContext, free : Boolean)
 case class ConstraintSet(
     ccs : Seq[ContextConstraint] = Seq.empty,
     cvcs : Seq[ContextVarConstraint] = Seq.empty,
-    tecs : Seq[TypeExprConstraint] = Seq.empty,
+    tecs : Seq[EqualityConstraint] = Seq.empty,
     scs : Seq[SubtypeConstraint] = Seq.empty,
     mcs : Seq[MethodConstraint] = Seq.empty) {
 
   def +(cc : ContextConstraint) = this.copy(ccs = cc +: ccs)
   def +(cvc : ContextVarConstraint) = this.copy(cvcs = cvc +: cvcs)
-  def +(tec : TypeExprConstraint) = this.copy(tecs = tec +: tecs)
+  def +(tec : EqualityConstraint) = this.copy(tecs = tec +: tecs)
   def +(sc : SubtypeConstraint) = this.copy(scs = sc +: scs)
   def +(mc : MethodConstraint) = this.copy(mcs = mc +: mcs)
   
