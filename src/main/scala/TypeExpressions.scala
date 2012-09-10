@@ -46,7 +46,7 @@ case class StateTE(nameVar : TypeVar, methods : Seq[MethodTE] = Seq.empty) {
 }
 
 case class MethodTE(name : String, ret : TypeExpr, next : TypeVar) {
-  override def toString = name + " : " + ret + " ≫ " + next
+  override def toString = name + " : " + ret + " ⇒ " + next
 }
 
 case class VarTE(typeVar : TypeVar) extends TypeExpr {

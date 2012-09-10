@@ -153,11 +153,18 @@ case class ConstraintSet(
     val typeCs = tecs ++ scs
     ("context constraints:\n\t" +
       (if (sortedCcs.isEmpty) "none" else sortedCcs.mkString("\n\t")) +
+      "\nvar constraints:\n\t" +
+      (if (cvcs.isEmpty) "none" else cvcs.mkString("\n\t")) +
       "\ntype constraints:\n\t" +
       (if (typeCs.isEmpty) "none" else typeCs.mkString("\n\t")) +
       "\nmethod constraints:\n\t" +
       (if(mcs.isEmpty) "none" else mcs.mkString("\n\t"))
     )
+  }
+
+  def toStringSimple = {
+    val sortedCcs = ccs.sortBy(_.context.v)
+    (sortedCcs ++ cvcs ++ tecs ++ scs ++ mcs).mkString("; ")
   }
 }
 

@@ -84,6 +84,9 @@ object Driver extends ParsingREPL[Command] with REPLParser {
     resetmessages
     org.kiama.attribution.Attribution.initTree(t)
     val constraints = ConstraintGenerator.generateConstraints(t)
+
+    println("term tree:\n")
+    ConstraintGenerator.printInferenceTree(t)
     println("constraints:\n" + constraints)
     if(debug) enableLogging()
     val solutionOpt = ConstraintSolver.solvePolymorphic(constraints, t)

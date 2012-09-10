@@ -306,4 +306,42 @@ object ConstraintGenerator {
 
   val paramToTypeExpr = 
     (pdef : ParamDef) => Pair(pdef.name, VarTE((pdef->tvGen).next()))
+
+
+  def printInferenceTree(t : Term, indent : Int = 0) {
+    val indentStr = "  " * indent
+    println(indentStr + 
+      "⟦ " + 
+      (t->inContextVar) + 
+      " ▷ " + 
+      t + 
+      " : " +
+      (t->typeVar) +
+      " ◁ " + 
+      (t->outContextVar) + 
+      " ⟧")
+    println(indentStr + (t->constraints).toStringSimple)
+    t match {
+      case ObjValue(states, _) =>
+        states.flatMap(_.methods).map(_.ret).foreach(printInferenceTree(_, indent + 1))
+      case FunValue(_, body) =>
+        printInferenceTree(body, indent + 1)
+      case LetBind(_, value, body) => {
+        printInferenceTree(value, indent + 1)
+        printInferenceTree(body, indent + 1)
+      }
+      case Update(_, body) =>
+        printInferenceTree(body, indent + 1)
+      case Sequence(left, right) => {
+        printInferenceTree(left, indent + 1)
+        printInferenceTree(right, indent + 1)
+      }
+      case If(cond,thn,els) => {
+        printInferenceTree(cond, indent + 1)
+        printInferenceTree(thn, indent + 2)
+        printInferenceTree(els, indent + 2)
+      }
+      case _ => return
+    }
+  }
 }

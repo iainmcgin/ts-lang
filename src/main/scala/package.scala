@@ -37,7 +37,7 @@ package object ts {
     if(c1.keySet != c2.keySet) {
       val c1Extra = c1.keySet -- c2.keySet
       val c2Extra = c2.keySet -- c1.keySet
-      Left(Seq(DifferentDomains(c1Extra, c2Extra)))
+      return Left(Seq(DifferentDomains(c1Extra, c2Extra)))
     }
 
     val (errors, ctx) = (c1.foldLeft
@@ -65,10 +65,27 @@ package object ts {
    */
   type PolyContext = Map[String,TypeExpr]
 
-  def joinPolyContexts(c1 : PolyContext, c2 : PolyContext) 
-    : Either[Seq[JoinError], PolyContext] = {
+  def joinPolyContexts(c1 : PolyContext, 
+    c2 : PolyContext, 
+    tvGen : TypeVarGenerator)
+    : Option[Pair[PolyContext, Seq[SubtypeConstraint]]] = {
     // TODO
-    Right(c1)
+    if(c1.keySet != c2.keySet) {
+      return None
+    }
+
+    Some(
+      c1.foldLeft
+        (Pair(c1.empty, Seq.empty[SubtypeConstraint]))
+        ((res, p) => {
+          var tv = VarTE(tvGen.next())
+          (res._1 + (p._1 -> tv), 
+            SubtypeConstraint(p._2, tv) +:
+            SubtypeConstraint(c2(p._1), tv) +:
+            res._2
+          )
+        })
+    )
   }
 
   /** an empty context, which maps all variable names to ErrorType */

@@ -11,14 +11,22 @@
 
 package uk.ac.gla.dcs.ts
 
+import scala.annotation.tailrec
+
 import org.kiama._
 import org.kiama.attribution.Attribution._
 import org.kiama.util.Messaging._
 import grizzled.slf4j.Logger
 
+import scalax.collection.Graph
+import scalax.collection.GraphPredef._
+import scalax.collection.GraphEdge._
+import scalax.collection.edge.Implicits._
+
 case class BadRootContextDef(contextDef : ContextDefinition) extends Exception
 case class UnresolvedDependency(contextDef : ContextDefinition) extends Exception
 case class CannotJoinContexts(contextDef : ContextDefinition) extends Exception
+case class CyclicDependency(g : Graph[ContextVar, DiEdge]) extends Exception
 case class MissingVariable(base : ContextVar, varName : String) 
   extends Exception("context " + base + " does not contain variable " + varName)
 case class DuplicateDefinition(base : ContextVar, varName : String) extends Exception
@@ -72,26 +80,26 @@ class ConstraintSolver(t : Term) {
 
     log.debug("solving constraints for " + t)
     log.debug("constraints: " + constraints)
-    val contexts = expandContexts(constraints.ccs, constraints.cvcs)
-    log.debug("expanded contexts: " + contexts)
+    val (contexts, extraScs) = expandContexts(constraints.ccs, constraints.cvcs)
+    log.debug("expanded contexts:\n\t" + contexts.mkString("\n\t"))
     val extraTypeConstraints = matchTypes(contexts, constraints.cvcs)
 
     // XXX: for now, treat all subtype constraints as equality, until a closure
     // algorithm is implemented that finds correct solutions that respect
     // subtyping
     val subtypeConstraints = 
-      constraints.scs.map(sc => TypeExprConstraint(sc.a, sc.b))
+      (constraints.scs ++ extraScs).map(sc => TypeExprConstraint(sc.a, sc.b))
 
     val allTypeConstraints = 
       constraints.tecs ++ extraTypeConstraints ++ subtypeConstraints
-    log.debug("derived type constraints: " + allTypeConstraints)
+    log.debug("derived type constraints:\n\t" + allTypeConstraints.mkString("\n\t"))
 
     val varsToTypeExprsOpt = unifyTypes(allTypeConstraints)
     
     varsToTypeExprsOpt.map(varsToTypeExprs => {
-      log.debug("type constraints solution: " + varsToTypeExprs)
+      log.debug("type constraints solution:\n\t" + varsToTypeExprs.mkString("\n\t"))
       val objects = solveMethodConstraints(constraints.mcs, varsToTypeExprs)
-      log.debug("inferred object types: " + objects)
+      log.debug("inferred object types:\n\t" + objects.mkString("\n\t"))
       val contextConverter = ((cv : ContextVar) =>
         contexts(cv).mapValues(te => 
           eliminateVariables(te, varsToTypeExprs, objects)._2)
@@ -114,7 +122,7 @@ class ConstraintSolver(t : Term) {
   def expandContexts(
     ccs : Seq[ContextConstraint], 
     cvcs : Seq[ContextVarConstraint]) 
-    : Map[ContextVar,PolyContext] = {
+    : (Map[ContextVar,PolyContext],Seq[SubtypeConstraint]) = {
 
     val ccById = 
       (ccs.foldLeft
@@ -127,41 +135,7 @@ class ConstraintSolver(t : Term) {
         ((m, c) => m.updated(c.context, c +: m.getOrElse(c.context, Seq.empty)))
       )
 
-    var dependencies =
-      (ccs.foldLeft
-        (Map.empty[ContextVar, Set[ContextVar]])
-        ((deps, c) => {
-          c.definedAs match {
-            case cwd : ContextWithDependency => {
-              deps.updated(cwd.base, 
-                deps.getOrElse(cwd.base, Set.empty) + c.context)
-            }
-            case cj : ContextJoin => {
-              (deps.
-                updated(cj.left, deps.getOrElse(cj.left, Set.empty) + c.context).
-                updated(cj.left, deps.getOrElse(cj.right, Set.empty) + c.context))
-            }
-            case bc : BaseContext => {
-              deps
-            }
-          }
-        })
-      )
-
-    var inCount =
-      (ccById.keySet.foldLeft
-        (Map.empty[ContextVar, Int])
-        ((inCount, contextVar) => {
-          val inCount2 = 
-            (dependencies.getOrElse(contextVar, Set.empty).foldLeft
-              (inCount)
-              ((inCount, dep) => 
-                inCount.updated(dep, inCount.getOrElse(dep, 0) + 1)
-              )
-            )
-          inCount2.updated(contextVar, inCount2.getOrElse(contextVar, 0))
-        })
-      )
+    var dependencyGraph = buildDependencyGraph(ccs)
 
     // we are guaranteed from the way context constraints are constructed
     // that the dependency graph is acyclic. Solve all constraints from
@@ -169,16 +143,18 @@ class ConstraintSolver(t : Term) {
 
     var contexts = Map.empty[ContextVar, SolvedContext]
     var transRoots = Map.empty[ContextVar, ContextVar]
+    var extraScs = Seq.empty[SubtypeConstraint]
 
-    var available : Set[ContextVar] = inCount.filter(_._2 == 0).keySet
-    while(!available.isEmpty) {
-      val next = available.head
-
-      var (contextsUpdated, transRootsUpdated) = 
+    val contextSortOpt = topologicalSort(dependencyGraph)
+    if(contextSortOpt.isEmpty) throw new CyclicDependency(dependencyGraph)
+    val contextSort = contextSortOpt.get
+    contextSort.foreach(next => {
+      var (contextsUpdated, transRootsUpdated, subtypeConstraints) = 
         solveCtxConstraint(ccById(next), contexts, transRoots)
 
       contexts = contextsUpdated
       transRoots = transRootsUpdated
+      extraScs = extraScs ++ subtypeConstraints
 
       val localCvcs = cvcsByContext.getOrElse(next, Seq.empty)
       contexts =
@@ -186,38 +162,74 @@ class ConstraintSolver(t : Term) {
           (contexts)
           ((ctxs, cvc) => checkForFreeVariable(cvc, ctxs, transRoots))
         )
-      
-      val tail : Set[ContextVar] = available.tail
-      val depCtxs : Set[ContextVar] = dependencies.getOrElse(next, Set.empty[ContextVar])
+    })
 
-      val newlyAvailable = (depCtxs.foldLeft
-        (Set.empty[ContextVar])
-        ((s, dep) => {
-          val newCount = inCount.getOrElse(dep, 1) - 1
-          inCount = inCount.updated(dep, newCount)
-          if (newCount <= 0) s + dep else s
-        })
-      )
-
-      available = newlyAvailable ++ tail
-    }
-
-    if(inCount.exists(_._2 > 0)) throw new RuntimeException("leftovers: " + inCount.filter(_._2 > 0))
-
-    contexts.mapValues(sc => sc.contents)
+    (contexts.mapValues(sc => sc.contents), extraScs)
   }
+
+  def buildDependencyGraph(constraints : Seq[ContextConstraint]) 
+    : Graph[ContextVar, DiEdge] =
+    (constraints.foldLeft
+      (Graph.empty[ContextVar, DiEdge])
+      ((g, c) => {
+        val ctx = c.context
+        c.definedAs match {
+          case cwd : ContextWithDependency => g + (cwd.base ~> ctx)
+          case cj : ContextJoin => g + (cj.left ~> ctx) + (cj.right ~> ctx)
+          case bc : BaseContext => g + ctx
+        }
+      })
+    )
+
+  /*
+   * code based on blog post by Andreas Flierl:
+   * http://blog.flierl.eu/2012/04/fun-with-topological-sorting-using.html
+   */
+  def topologicalSort(g : Graph[ContextVar, DiEdge]) 
+    : Option[List[ContextVar]] = {
+    type NodeType = g.NodeT
+    case class Memo(
+      sorted : List[NodeType] = Nil, 
+      grey : Graph[ContextVar, DiEdge] = Graph.empty[ContextVar, DiEdge],
+      black : Graph[ContextVar, DiEdge] = Graph.empty[ContextVar, DiEdge])
+
+    @tailrec
+    def depthFirst(stack: List[NodeType], m: Memo): Option[Memo] = 
+      stack match {
+        case node :: nodes if m.black.contains(node) =>
+          depthFirst(nodes, m)
+        case node :: nodes =>
+          val neighbours = stack.head.outNeighbors.toList
+          if (neighbours.exists(m.grey.contains)) 
+            None
+          else if (neighbours.forall(m.black.contains))
+            depthFirst(nodes, 
+              Memo(node :: m.sorted, m.grey - node, m.black + node))
+          else
+            depthFirst(neighbours ++ stack, m.copy(grey = m.grey + node))
+        case _ => Some(m)
+      }
+
+    (g.nodes.foldLeft
+      (Option(Memo()))
+      ((result, node) => result.flatMap(m => depthFirst(List(node), m)))
+    ).map(_.sorted.map(_.value))
+  }
+
 
   def solveCtxConstraint(
     cc : ContextConstraint,
     contexts : Map[ContextVar, SolvedContext],
     transRoots : Map[ContextVar, ContextVar]) 
-    : (Map[ContextVar, SolvedContext], Map[ContextVar, ContextVar]) = {
+    : (Map[ContextVar, SolvedContext], 
+       Map[ContextVar, ContextVar],
+       Seq[SubtypeConstraint]) = {
 
     cc.definedAs match {
       case BaseContext(contents, free) => {
         val contexts2 = contexts + (cc.context -> SolvedContext(contents, free))
         val transRoots2 = transRoots + (cc.context -> cc.context)
-        (contexts2, transRoots2)
+        (contexts2, transRoots2, Seq.empty)
       }
       case cd : ContextWithDependency =>
         contexts.get(cd.base) match {
@@ -226,24 +238,22 @@ class ConstraintSolver(t : Term) {
             val contexts2 = 
               normaliseContext(cc.context, cd, contexts, transRoots)
             val transRoots2 = transRoots + (cc.context -> transRoots(cd.base))
-            (contexts2, transRoots2)
+            (contexts2, transRoots2, Seq.empty)
           }
         }
       case cj : ContextJoin =>
         (contexts.get(cj.left), contexts.get(cj.right)) match {
           case (Some(left), Some(right)) => {
-            joinPolyContexts(left.contents, right.contents) match {
-              case Left(errs) =>
-                throw new CannotJoinContexts(cj)
-              case Right(ctx) => {
+            joinPolyContexts(left.contents, right.contents, t->tvGen).
+              map(res => {
+                val (ctx, scs) = res
                 val contexts2 = contexts + 
                   (cc.context -> SolvedContext(ctx, false))
                 val transRoots2 = transRoots + 
                   (cc.context -> transRoots(cj.left))
-                (contexts2, transRoots2)
-              }
-            }
-            
+                (contexts2, transRoots2, scs)
+              }).
+              getOrElse(throw new CannotJoinContexts(cj))
           }
           case _ => throw new UnresolvedDependency(cj)
         }
