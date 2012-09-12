@@ -85,9 +85,27 @@ object Driver extends ParsingREPL[Command] with REPLParser {
     org.kiama.attribution.Attribution.initTree(t)
     val constraints = ConstraintGenerator.generateConstraints(t)
 
-    println("term tree:\n")
+    println("term tree:")
     ConstraintGenerator.printInferenceTree(t)
-    println("constraints:\n" + constraints)
+    println("constraints:")
+    println(constraints)
+    val solver = new ConstraintSolver(t)
+    val (contexts, eqConstraints, subConstraints) = 
+      solver.reduceToTypeConstraints(constraints)
+    
+    println("contexts after normalisation:")
+    contexts.keySet.toList.sortBy(_.v).foreach(cv => 
+      println("\t" + cv + " = " + contexts(cv).mkString(", ")))
+
+    println("full type constraint set:")
+    println("\t" + eqConstraints.mkString("\n\t"))
+    println("\t" + subConstraints.mkString("\n\t"))
+
+    solver.solveTypeConstraints(contexts, 
+      eqConstraints, 
+      subConstraints,
+      constraints.mcs)
+
     if(debug) enableLogging()
     val solutionOpt = ConstraintSolver.solvePolymorphic(constraints, t)
     if(debug) disableLogging()

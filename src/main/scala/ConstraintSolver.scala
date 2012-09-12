@@ -78,27 +78,47 @@ class ConstraintSolver(t : Term) {
   def solvePolymorphic(constraints : ConstraintSet)
     : Option[Tuple4[PolyContext,Set[TypeVar],TypeExpr,PolyContext]] = {
 
-    log.debug("solving constraints for " + t)
-    log.debug("constraints: " + constraints)
+
+    val (contexts, eqConstraints, subConstraints) = 
+      reduceToTypeConstraints(constraints)
+    
+    solveTypeConstraints(contexts, 
+      eqConstraints, 
+      subConstraints,
+      constraints.mcs)
+  }
+
+  def reduceToTypeConstraints(constraints : ConstraintSet)
+    : (Map[ContextVar,PolyContext], Seq[EqualityConstraint], Seq[SubtypeConstraint]) = {
+
     val (contexts, extraScs) = expandContexts(constraints.ccs, constraints.cvcs)
-    log.debug("expanded contexts:\n\t" + contexts.mkString("\n\t"))
     val extraTypeConstraints = matchTypes(contexts, constraints.cvcs)
+
+    (contexts, 
+      constraints.tecs ++ extraTypeConstraints, 
+      constraints.scs ++ extraScs)
+  }
+
+  def solveTypeConstraints(
+    contexts : Map[ContextVar, PolyContext],
+    equalityConstraints : Seq[EqualityConstraint],
+    subtypeConstraints : Seq[SubtypeConstraint],
+    methodConstraints : Seq[MethodConstraint]) :
+    Option[Tuple4[PolyContext,Set[TypeVar],TypeExpr,PolyContext]] = {
 
     // XXX: for now, treat all subtype constraints as equality, until a closure
     // algorithm is implemented that finds correct solutions that respect
     // subtyping
-    val subtypeConstraints = 
-      (constraints.scs ++ extraScs).map(sc => EqualityConstraint(sc.a, sc.b))
+    val stubbedScsConstraints = 
+      subtypeConstraints.map(sc => EqualityConstraint(sc.a, sc.b))
 
-    val allTypeConstraints = 
-      constraints.tecs ++ extraTypeConstraints ++ subtypeConstraints
-    log.debug("derived type constraints:\n\t" + allTypeConstraints.mkString("\n\t"))
+    val allTypeConstraints = equalityConstraints ++ stubbedScsConstraints
 
     val varsToTypeExprsOpt = unifyTypes(allTypeConstraints)
     
     varsToTypeExprsOpt.map(varsToTypeExprs => {
       log.debug("type constraints solution:\n\t" + varsToTypeExprs.mkString("\n\t"))
-      val objects = solveMethodConstraints(constraints.mcs, varsToTypeExprs)
+      val objects = solveMethodConstraints(methodConstraints, varsToTypeExprs)
       log.debug("inferred object types:\n\t" + objects.mkString("\n\t"))
       val contextConverter = ((cv : ContextVar) =>
         contexts(cv).mapValues(te => 
