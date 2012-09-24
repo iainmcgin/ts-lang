@@ -38,8 +38,6 @@ t :: 't_' ::=
     {{ com method inv. }}
   | let x = t in t'            ::  :: LetBind
     {{ com let bind }}
-  | x := t                     ::  :: VarUpdate
-    {{ com update }}
   | t ; t'                     ::  :: Seq
     {{ com sequencing }}
   | { </ xi / yi // i /> } t   :: M:: Subst
@@ -65,6 +63,13 @@ v :: 'v_' ::=
 o :: 'o_' ::=
 {{ com object defn. }}
   | [ </ svi // i /> ]      ::  :: Body
+    {{ tex 
+      \left[\: \overline{
+        S_i \{ \overline{
+          m_{ij} = (v_{ij},S_{ij})
+        }^{j} \}
+      }^{i} \:\right]
+    }}
 
 
 sv :: 'sv_' ::=
@@ -82,17 +87,30 @@ T, U, V :: 'T_' ::=
     {{ com unit }}
   | Bool                                  ::  :: Boolean
     {{ com boolean }}
-  | O @ S                                 ::  :: ObjType
+  | O @ SSet                              ::  :: ObjType
     {{ com object }}
   | ( </ Ti >> Ti' // i /> ) -> T         ::  :: Fun
     {{ com function }}
   | forall </ ai // i /> . T              :: M:: UniType
     {{ com universal quantification }}
 
+SSet {{ tex \overline{S} }} :: 'SSet_' ::=
+{{ com current state set }}
+  | S                   :: S:: Single
+  | { </ Si // i /> }   ::  :: Multiple
+    {{ com set of possible states }}
+    {{ tex \overline{S} }}
 
 O :: 'O_' ::= 
-{{ com object body }}
+{{ com object protocol }}
   | { </ sti // i /> }    ::   :: Protocol
+    {{ tex 
+      \left\{ \: \overline{ 
+          S_i \{ 
+            \overline{ m_{ij} : T_{ij} \Rightarrow S_{ij} }^{j}
+          \} 
+      }^{i} \: \right\} 
+    }}
 
 
 st :: 'st_' ::=
@@ -208,7 +226,7 @@ sinf {{ tex \mathbb{S} }} :: 'SInf_' ::=
 terminals :: 'terminals_' ::=
   | \            ::  :: lambda     {{ tex \lambda }}
   | -->          ::  :: red        {{ tex \longrightarrow }}
-  | >>           ::  :: typechange {{ tex \gg }}
+  | >>           ::  :: typechange {{ tex \ensuremath{\gg} }}
   | ->           ::  :: func       {{ tex \rightarrow }}
   | =>           ::  :: match      {{ tex \Rightarrow }}
   | empty        ::  :: empty      {{ tex \emptyset }}
@@ -226,6 +244,10 @@ terminals :: 'terminals_' ::=
   | or           ::  :: boolor     {{ tex \vee }}
   | sim          ::  :: simulation {{ tex \sim }}
   | join         ::  :: join       {{ tex \sqcup }}
+  | meet         ::  :: meet       {{ tex \sqcap }}
+  | union        ::  :: union      {{ tex \cup }}
+  | intersect    ::  :: intersect  {{ tex \cap }}
+  | bigjoin      ::  :: bigjoin    {{ tex \bigsqcup }}
   | forall       ::  :: forall     {{ tex \forall }}
   | equiv        ::  :: equiv      {{ tex \equiv }}
   | unit         ::  :: unit       {{ tex \mathtt{unit} }}
@@ -300,15 +322,6 @@ Jop :: '' ::=
     let x = v in t | mu --> t | mu [ x |-> v ]
 
 
-    t | mu --> t' | mu'
-    ------------------------------------------------  :: update_expr
-    x := t | mu , x |-> v --> x := t' | mu' , x |-> v
-
-
-    ------------------------------------------------  :: update_value
-    x := v | mu , x |-> v' --> unit | mu , x |-> v
-
-
     t | mu --> t'' | mu'
     ----------------------------- :: seq_left_term
     t ; t' | mu --> t'' ; t | mu'
@@ -352,22 +365,25 @@ defns Jty :: '' ::=
   G ( x ) = T  ::  ::typeof::'to_'
   {{ com [[x]] has type [[T]] in [[G]] }} by
 
+  defn
+  T = U
+  ::  ::'typevar'::'tv_'
+  {{ com [[T]] is the same type as [[U]] }} by
 
   defn
-  Meth ( O @ S . m ) ::  ::validmeth::'vm_'
-  {{ com [[m]] is a known method of object type [[O]] at state [[S]]}} by
+  SSet' = Next ( O @ SSet . m ) ::  ::nextstate::'ns_'
+  {{ com [[SSet']] is the set of successor states after calling method [[m]] 
+    on object protocol [[O]] in state set [[SSet]] }} 
+  {{ tex [[SSet']] = \{ S_n \: | \: m : T_r \Rightarrow S_n \in [[O]]@S, S \in [[SSet]] \} }}
+    by
 
 
   defn
-  Next ( O @ S . m ) = S' ::  ::nextstate::'ns_'
-  {{ com [[S']] is the next state after calling method [[m]] on object type 
-         [[O]] in state [[S]]}} by
-
-
-  defn
-  RType ( O @ S . m ) = T ::  ::returntype::'rt_'
-  {{ com [[T]] is the return type of method [[m]] on object type [[O]] in 
-         state [[S]]}} by
+  T = RType ( O @ SSet . m ) ::  ::returntype::'rt_'
+  {{ com [[T]] is the joined return type of each method [[m]] 
+     in each state of [[SSet]] in object protocol [[O]] }} 
+  {{ tex [[T]] = \bigsqcup{ \{ T_r \: | \: m : T_r \Rightarrow S_n \in [[O]]@S, S \in [[SSet]] \} } }}
+     by
 
 
   defn
@@ -449,8 +465,8 @@ defns Jty :: '' ::=
 %---------------
 
   defn
-  O @ S sim O' @ S' ::  ::simulation::'sim_'
-  {{ com [[O]]@[[S]] is a simulation of [[O']]@[[S']]}} by
+  O @ SSet sim O' @ SSet' ::  ::simulation::'sim_'
+  {{ com [[O]]@[[SSet]] is a simulation of [[O']]@[[SSet']]}} by
 
   defn
   T <: T'  ::  ::subtype::'sub_'
@@ -473,22 +489,122 @@ defns Jty :: '' ::=
     ( </ Ti >> Ti' // i /> ) -> T <: ( </ Ui >> Ui' // i /> ) -> U'
 
 
-    O @ S sim O' @ S'
+    O @ SSet sim O' @ SSet'
     -------------- :: obj
-    O @ S <: O' @ S'
+    O @ SSet <: O' @ SSet'
 
 %---------------
 % typing rules -
 %---------------
 
   defn
-  T join T' = U ::  ::jointypes::'jt_'
-  {{ com the joing of [[T]] and [[T']] is equal to [[U]] }} by
+  SSet = SSet' union SSet''
+  ::  ::stsetunion::'ssu_'
+  {{ tex [[SSet]] = [[SSet']] \cup [[SSet'']] }} by
 
+  defn
+  O @ SSet = computeUnion ( O' @ SSet' , O'' @ SSet'' )
+  ::  ::computeunion::'cou_' by
+
+  defn
+  O @ SSet = computeIntersection ( O' @ SSet' , O'' @ SSet'' )
+  ::  ::computemeet::'com_' by
+
+  defn
+  U = T join T' ::  ::jointypes::'jt_'
+  {{ com the join of [[T]] and [[T']] is equal to [[U]] }}
+  by
+
+    --------------------- :: unit
+    Unit = Unit join Unit
+
+    --------------------- :: bool
+    Bool = Bool join Bool
+
+    Ui'' = Ui join Ui'
+    Ti'' = Ti meet Ti'
+    V'' = V join V'
+    --------------------- :: func
+    ( </ Ti'' >> Ui'' // i /> ) -> V'' = ( </ Ti >> Ui // i /> ) -> V join ( </ Ti' >> Ui' // i /> ) -> V'
+
+    SSet'' = SSet union SSet'
+    ------------------------------------ :: obj_same
+    O @ SSet'' = O @ SSet join O @ SSet'
+
+    O'' @ SSet'' = computeIntersection( O @ SSet , O' @ SSet' )
+    ----------------------------------------------------------- :: obj_diff
+    O'' @ SSet'' = O @ SSet join O' @ SSet'
+
+  defn
+  U = T meet T' ::  ::meettypes::'mt_'
+  {{ com the meet of [[T]] and [[T']] is equal to [[U]] }}
+  by
+
+    --------------------- :: unit
+    Unit = Unit meet Unit
+
+    --------------------- :: bool
+    Bool = Bool meet Bool
+
+    Ui'' = Ui meet Ui'
+    Ti'' = Ti join Ti'
+    V'' = V meet V'
+    --------------------- :: func
+    ( </ Ti'' >> Ui'' // i /> ) -> V'' = ( </ Ti >> Ui // i /> ) -> V meet ( </ Ti' >> Ui' // i /> ) -> V'
+
+    O'' @ SSet'' = computeUnion ( O @ SSet , O @ SSet'' )
+    ----------------------------------------------------- :: obj
+    O'' @ SSet'' = O @ SSet meet O @ SSet'
+
+  defn
+  T = setjoin </ Ti // i />
+  :: ::setjointypes::'sjt'
+  {{ com joining sets of types }}
+  {{ tex T = \bigsqcup{ \overline{T_i} } }} by
 
   defn
   G join G' = G'' ::  ::joinctx::'jg_'
   {{ com [[G]] joined with [[G']] is equal to [[G'']] }} by
+
+  defn
+  v : T
+  ::  ::fakevartyping::'fvt_'
+  {{ tex \emptyset \triangleright v_{ij} : T_{ij} \triangleleft \emptyset }} by
+
+  defn
+  S in SSet
+  ::  ::fakesetinclude::'fsi_'
+  {{ tex S \in \overline{S} }} by
+  
+  defn
+  SSet' = SimExtract ( O , O' @ SSet )
+  ::  ::statesimextract::'sim_' 
+  {{ tex [[SSet']] = \{ S \: | \: O @ S \sim O' @ S', S \in \overline{S}, S' \in [[SSet]] \} }}
+  by
+
+  defn
+  T' = remap ( T , U >> V )
+  ::  ::objeffextract::'remap_'
+  {{ com [[T']] is the remapped output of effect type [[U]] [[>>]] [[V]] given input [[T]] }}
+  by
+
+
+    ----------------------- :: unit
+    Unit = remap ( Unit , Unit >> Unit )
+
+
+    ----------------------- :: bool
+    Bool = remap ( Bool , Bool >> Bool )
+
+    U = ( </ Ti >> Ti' // i /> ) -> T'
+    T <: U
+    ------------------------------------------------------------------- :: func
+    T = remap ( T , U >> U )
+
+    O @ SSet <: O' @ SSet2
+    SSet4 = SimExtract ( O , O' @ SSet3 )
+    --------------------- :: obj
+    O @ SSet4 = remap ( O @ SSet , O' @ SSet2 >> O' @ SSet3 )
 
   defn
   G |> t : T <| G' :: ::type::'t_'  
@@ -507,8 +623,7 @@ defns Jty :: '' ::=
     G |> false : Bool <| G
 
 
-    svi : sti
-    S setin </ svi // i />
+    v : T
     --------------------------------------------------------- :: object
     G |> [ </ svi // i /> ] @ S : { </ sti // i /> } @ S <| G
 
@@ -525,35 +640,30 @@ defns Jty :: '' ::=
     G |> let x = t' in t : T <| G''
 
 
-    G |> t : T' <| G'
-    --------------------------------------- :: update
-    G , x : T |> x := t : Unit <| G' , x : T'
-
-
     G |> t : T <| G'
     G' |> t' : T' <| G''
     ----------------------- :: seq
     G |> t ; t' : T' <| G''
 
   
-    G ( x ) = ( </ Ui >> Ti' // i /> ) -> T
+    G ( x ) = ( </ Ui >> Vi // i /> ) -> T
     Ti <: Ui
+    Ti' = remap ( Ti , Ui >> Vi )
     ---------------------------------------------------------------------------- :: fun_call
     G , </ xi : Ti // i /> |> x ( </ xi // i /> ) : T <| G, </ xi : Ti' // i />
 
 
-    Meth ( O @ S . m )
-    Next ( O @ S . m ) = S'
-    RType ( O @ S . m ) = T
+    SSet' = Next ( O @ SSet . m )
+    T = RType ( O @ SSet . m )
     -------------------------------------------- :: meth_call
-    G , x : O @ S |> x . m : T <| G , x : O @ S'
+    G , x : O @ SSet |> x . m : T <| G , x : O @ SSet'
 
 
     G  |> t1 : Bool <| G1
     G1 |> t2 : T2 <| G2
     G1 |> t3 : T3 <| G3
     G2 join G3 = G4
-    T2 join T3 = T
+    T = T2 join T3
     -------------------------------------- :: if
     G |> if t1 then t2 else t3 : T <| G4
 
@@ -569,5 +679,10 @@ defns Jty :: '' ::=
 
     T <: U
     G |> t : T <| G', x : T
-    ------------------------ :: sub_ctx
+    ------------------------ :: widen
     G |> t : T <| G', x : U
+
+    T <: U
+    G , x : U |> t : T <| G'
+    ------------------------- :: narrow
+    G , x : T |> t : T <| G'    
