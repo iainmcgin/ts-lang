@@ -398,7 +398,8 @@ defns Jty :: '' ::=
   sv : st   ::  ::methtype::'mt_'
   {{ com state declaration [[sv]] matches state typing [[st]]}} by
 
-    empty |> vi : Ti <| empty
+    empty |> vi : Ti' <| empty
+    Ti' <: Ti
     -------------------- :: state
     S { </ mi = ( vi , Si ) // i /> } : S { </ mi : Ti >> Si // i /> }
 
@@ -563,7 +564,7 @@ defns Jty :: '' ::=
   {{ tex T = \bigsqcup{ \overline{T_i} } }} by
 
   defn
-  G join G' = G'' ::  ::joinctx::'jg_'
+  G = G' join G'' ::  ::joinctx::'jg_'
   {{ com [[G]] joined with [[G']] is equal to [[G'']] }} by
 
   defn
@@ -662,7 +663,7 @@ defns Jty :: '' ::=
     G  |> t1 : Bool <| G1
     G1 |> t2 : T2 <| G2
     G1 |> t3 : T3 <| G3
-    G2 join G3 = G4
+    G4 = G2 join G3
     T = T2 join T3
     -------------------------------------- :: if
     G |> if t1 then t2 else t3 : T <| G4

@@ -96,7 +96,7 @@
 \ottmu\ottinterrule
 }
 
-\ottdefnvalidstore
+%\ottdefnvalidstore
 
 \ottdefnreduce
 
@@ -108,7 +108,7 @@
 \ottT\ottinterrule
 }
 
-\ottdefnvalidgamma
+%\ottdefnvalidgamma
 
 \ottdefnstoretype
 
@@ -158,82 +158,98 @@ The term $t$ is of one of the following forms:
 
 \begin{itemize}
 \item $t$ is a value, so by \lemref{lem:valuectx} it follows that
-$\Gamma = \Gamma'$ and $T = V$. Let $V' = V$.
+$\Gamma = \Gamma'$ and $T = V$. Let $V' = T'$.
 The contexts for values can be arbitrary as long
 as they are equal, therefore $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
 
 \item $t = \lett{y}{t'}{t''}$. It follows from the rule \tlet that
-$x != y$ and that there exists $\Gamma_1, \Gamma_2, T_y, T_y'$ such that
+$x \neq y$ (as variables cannot be rebound) and that there exists 
+$\Gamma_1, \Gamma_2, T_y, T_y'$ such that
 $\typerule{\Gamma, x : T}{t'}{T_y}{\Gamma_1, x : T_2}$ and
 $\typerule{\Gamma_1, x : T_2, y : T_y}{t''}{U}{\Gamma', x : T_3, y : T_y'}$.
-Let $V' <: T_y'$.
 By induction, it follows that there exists a type $V_2 <: T_2$ such that
 $\typerule{\Gamma, x : T'}{t'}{T_y}{\Gamma_1, x : V_2}$.
 As $V_2 <: T_2$, it also follows by induction that
-$\typerule{\Gamma_1, x : V_2, y : T_y}{t''}{U}{\Gamma', x : T_3, y : V'}$.
-Therefore, the rules of \tlet are satisfied such that
+$\typerule{\Gamma_1, x : V_2, y : T_y}{t''}{U}{\Gamma', x : T_3, y : V_3}$.
+Let $V' = V_3$. The rules of \tlet are satisfied such that
 $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
 
 \item $t = y ( \overline{z_i} )$. 
 It follows from the rule \tfunc that there exists
 $\Gamma_1, \overline{T_i}, \overline{U_i}, \overline{V_i}, \overline{T_i'}$ 
 such that 
-$\Gamma = \Gamma_1, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i}$
+$\Gamma, x : T = \Gamma_1, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i}$
 and that
-$\Gamma' = \Gamma_1, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i'}$
+$\Gamma', x : V = \Gamma_1, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i'}$
 such that for each $i$, $T_i <: U_i$, $T_i' <: V_i$ 
 and $U <: U'$.
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+
 There are three cases to consider:
 \begin{itemize}
-\item $x \neq y$ and $x \notin \overline{x_i}$, meaning that $x \in \Gamma_1$
-and therefore $T = V$.
-$\Gamma_1$ can be arbitrary in \tfunc, therefore we can apply
-\tnarrow and choose $V' = T'$, giving 
-$\typerule{\Gamma, x : T'}{y ( \overline{z_i} )}{U}{\Gamma', x : V'}$.
+\item $x \neq y$ and $x \notin \overline{x_i}$, meaning that
+$\Gamma_1 = \Gamma_2, x : T$ for some $\Gamma_2$, that
+$\Gamma = \Gamma_2, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i}$
+and that $\Gamma' = \Gamma_2, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i'}$.
+Additionally, $T = V$. It follows that $t$ can be typed without $x$
+such that $\typerule{\Gamma}{t}{U}{\Gamma'}$. Let $V' = T'$. 
+By the weakening lemma, $\typerule{\Gamma, x : T'}{t}{T}{\Gamma', x : V'}$.
 
-\item $x = y$. $T'$ must therefore be of form $\funt{U_i'}{V_i'}{U'}$ 
-such that for each $i$, $U_i <: U_i'$, $V_i' <: V_i$, $U' <: U$. Additionally,
-$V = T$. Let $V' = V$. It follows by rule \tfunc and \tsub that
+\item $x = y$, meaning $\Gamma = \Gamma_1, \overline{z_i : T_i}$ and
+$\Gamma' = \Gamma_1, \overline{z_i : T_i'}$. 
+Additionally, $T = V = \funt{U_i}{V_i}{U}$.
+$T'$ must therefore be of form $\funt{U_i'}{V_i'}{U'}$ 
+such that for each $i$, $U_i <: U_i'$, $V_i' <: V_i$, $U' <: U$ by the
+definition of subtyping. Let $V' = T'$. 
+It follows by rule \tfunc, and \tsub to replace $U'$ with $U$, that
 $\typerule{\Gamma, x : T'}{x ( \overline{z_i})}{U}{\Gamma', x : V'}$.
 
-\item $x \in \overline{z_i}$, meaning that $T = T_i$ and $V = T_i'$ for some $i$.
-Let $V' = V$. The by rule \tnarrow,
-$\typerule{\Gamma, x : T'}{y ( \overline{z_i})}{U}{\Gamma, x : V'}$.
+\item $x \in \overline{z_i}$, meaning that $T = T_i$ and 
+$V = T_i' = remap(T, U_i >> V_i)$ for some $i$. 
+Let $V' = remap(T', U_i >> V_i)$.
+The rule \tfunc permits $T$ to be replaced with $T'$
+as $T' <: T$, such that
+% MUST SHOW V' <: V$.
+$\typerule{\Gamma, x : T'}{y ( \overline{z_i} )}{U}{\Gamma, x : V'}$.
 
 \end{itemize}
 
-\item $t = y.m$. 
+\item $t = y.m$. By the rule $\tmethc$ it follows that
+$\Gamma, x : T = \Gamma_1, y : O@\overline{S}$
+and that
+$\Gamma', x : V = \Gamma_1, y : O@\overline{S'}$
+for some $\Gamma_1, O, \overline{S}$ and $\overline{S'}$
+where
+$\overline{S'} = \{ S_n | m : T_r \Rightarrow S_n \in O@S, S \in \overline{S} \}$.
+Additionally, 
+$U = \bigsqcup{ \{ T_r | m : T_r \Rightarrow S_n \in O@S, S \in \overline{S} \} }$.
 There are two cases to consider:
 
 \begin{itemize}
-\item $x = y$. It follows by rule \tmethc that $T = O@\overline{S}$ for
-some $O$ and $\overline{S}$, and that $V = O@\overline{S}'$ where
-$S' = \{ S_n | m : T_r \Rightarrow S_n \in O@S, S \in \overline{S} \}$.
-Additionally, 
-$U = \bigsqcup{ \{ T_r | m : T_r \Rightarrow S_n \in O@S, S \in \overline{S} \} }$.
+\item $x = y$. It follows that $\Gamma = \Gamma_1 = \Gamma'$ and
+that $T = O@\overline{S}, V = O@\overline{S'}$.
+$T'$ must be of form $O'@\overline{S}''$ such that
+$O'@\overline{S}'' \sim O@\overline{S}$ by the definition of subtyping. 
 
-$T'$ must be of form $O'@\overline{S}''$. Let $V' = O'@\overline{S}'''$
+Let $V' = O'@\overline{S}'''$
 where
 $S''' = \{ S_n' | m : T_r' \Rightarrow S_n' \in O'@S'', S'' \in \overline{S}''\}$.
 Let $U' = \bigsqcup{ \{ T_r' | m : T_r' \Rightarrow S_n' \in O'@S'', S'' \in \overline{S}'' \} }$.
-
-By the definition of subtyping, 
-$O'@\overline{S}'' \sim O@\overline{S}$, which implies that
-$O'@\overline{S}''' \sim O@\overline{S}'$. Therefore, $U' <: U$
-and $V' <: V$. By the rule \tsub, it follows that
-$\typerule{\Gamma, x : T'}{x.m}{U}{\Gamma', x : V'}$.
+As $O'@\overline{S}'' \sim O@\overline{S}$, it follows that
+$O'@\overline{S}''' \sim O@\overline{S}'$.
+Therefore, $U' <: U$ and $V' <: V$. By the rule \tmethc, and \tsub
+to replace $U'$ with $U$, it follows that
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
 
 \item $x \neq y$. It follows that $\Gamma = \Gamma'', y : O@\overline{S}$
 and that $\Gamma' = \Gamma'', y : O@\overline{S'}$
 for some $\Gamma''$, $O$ and $\overline{S}$.
-As $x$ is irrelevant in the rule \tmethc in this case, it follows that
-$T = V$. Let $V' = T'$. By the rule \tnarrow,
-$\typerule{\Gamma', x : T'}{y.m}{U}{\Gamma, x : V'}$.
+It follows that $\typerule{\Gamma}{t}{U}{\Gamma'}$.
+Let $V' = T'$. By the weakening lemma, 
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
 \end{itemize}
 
 \item $t = t' ; t''$. It follows by rule \tlet that there exists
-$\Gamma'', T_{mid}, U'$ 
+$\Gamma'', V_{mid}, U'$ 
 such that $\typerule{\Gamma, x : T}{t'}{U'}{\Gamma'', x : V_{mid}}$
 and that $\typerule{\Gamma'', x : V_{mid}}{t''}{U}{\Gamma', x : V}$.
 By induction, it follows that there exists $V_{mid}'$ 
@@ -243,8 +259,6 @@ such that
 $\typerule{\Gamma'', x : V_{mid}'}{t''}{U}{\Gamma'', x : V_{end}}$.
 Let $V' = V_{end}$. By rule \tlet it follows that
 $\typerule{\Gamma, x : T'}{t' ; t''}{U}{\Gamma'', x : V'}$.
-
-\end{itemize}
 
 \item $t = \ift{t_c}{t_t}{t_f}$. It follows from rule \tif that there
 exists $\Gamma_1$, $\Gamma_2$, $\Gamma_3$, $U_t$, $U_f$, $V_c$, $V_t$ and
@@ -263,6 +277,8 @@ and that $\typerule{\Gamma_1, x : V_c'}{t_f}{T_f}{\Gamma_3, x : V_f'}$.
 Let $V' = V_t' \sqcup V_f'$. By the definition of join, $V' <: V$.
 It follows by rule \tif that
 $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+
+\end{itemize}
 
 \end{proof}
 
