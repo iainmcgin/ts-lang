@@ -74,6 +74,7 @@ o :: 'o_' ::=
 
 sv :: 'sv_' ::=
 {{ com state defn. }}
+{{ tex S \{ \overline{m_i = (v_i, S_i)} \} }}
   | S { </ mi = ( vi , Si ) // i /> }    ::  :: State 
     {{ com state declaration }}
 
@@ -115,6 +116,7 @@ O :: 'O_' ::=
 
 st :: 'st_' ::=
 {{ com object state }}
+{{ tex S \{ \overline{ m_i : T_i \Rightarrow S_i } \} }}
   | S { </ mi : Ti >> Si // i /> }    ::  :: State
 
 
@@ -396,10 +398,10 @@ defns Jty :: '' ::=
 
   defn
   sv : st   ::  ::methtype::'mt_'
-  {{ com state declaration [[sv]] matches state typing [[st]]}} by
+  {{ com state declaration matches state typing }}
+  by
 
-    empty |> vi : Ti' <| empty
-    Ti' <: Ti
+    empty |> vi : Ti <| empty
     -------------------- :: state
     S { </ mi = ( vi , Si ) // i /> } : S { </ mi : Ti >> Si // i /> }
 
@@ -469,6 +471,7 @@ defns Jty :: '' ::=
   O @ SSet sim O' @ SSet' ::  ::simulation::'sim_'
   {{ com [[O]]@[[SSet]] is a simulation of [[O']]@[[SSet']]}} by
 
+
   defn
   T <: T'  ::  ::subtype::'sub_'
   {{ com [[T]] is a subtype of [[T']] }}
@@ -483,11 +486,11 @@ defns Jty :: '' ::=
     ------- :: trans
     T <: V
 
-    Ui <: Ti
-    Ti' <: Ui'
-    T <: U
+    Ti' <: Ti
+    Ui <: Ui'
+    V <: V'
     --------------------------------------------------------------- :: fn
-    ( </ Ti >> Ti' // i /> ) -> T <: ( </ Ui >> Ui' // i /> ) -> U'
+    ( </ Ti >> Ui // i /> ) -> V <: ( </ Ti' >> Ui' // i /> ) -> V'
 
 
     O @ SSet sim O' @ SSet'
@@ -580,7 +583,7 @@ defns Jty :: '' ::=
   defn
   SSet' = SimExtract ( O , O' @ SSet )
   ::  ::statesimextract::'sim_' 
-  {{ tex [[SSet']] = \{ S \: | \: O @ S \sim O' @ S', S \in \overline{S}, S' \in [[SSet]] \} }}
+  {{ tex [[SSet']] = \{ S \: | \: [[O]] @ S \sim O' @ [[SSet]], S \in [[O]] \} }}
   by
 
   defn

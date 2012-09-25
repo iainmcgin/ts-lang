@@ -22,6 +22,7 @@
 \newcommand{\lstref}[1]{Listing \ref{#1}}
 \newcommand{\appref}[1]{Appendix \ref{#1}}
 \newcommand{\lemref}[1]{Lemma \ref{#1}}
+\newcommand{\corref}[1]{Corollary \ref{#1}}
 
 \newcommand{\rlett}{\textsc{r\_let\_term} }
 \newcommand{\rletv}{\textsc{r\_let\_value} }
@@ -45,9 +46,20 @@
 \newcommand{\tmethc}{\textsc{t\_meth\_call} }
 \newcommand{\tdrop}{\textsc{t\_drop} }
 \newcommand{\tsub}{\textsc{t\_sub} }
-\newcommand{\tsubctx}{\textsc{t\_widen} }
 \newcommand{\tnarrow}{\textsc{t\_narrow} }
 \newcommand{\twiden}{\textsc{t\_widen} }
+
+\newcommand{\subrefl}{\textsc{sub\_refl}}
+\newcommand{\subtrans}{\textsc{sub\_trans}}
+\newcommand{\subfn}{\textsc{sub\_fn}}
+\newcommand{\subobj}{\textsc{sub\_obj}}
+
+\newcommand{\remapunit}{\textsc{remap\_unit}}
+\newcommand{\remapbool}{\textsc{remap\_bool}}
+\newcommand{\remapfunc}{\textsc{remap\_func}}
+\newcommand{\remapobj}{\textsc{remap\_obj}}
+
+\newcommand{\remapapp}[3]{\ensuremath{\mathbf{remap}(#1, #2 \gg #3)}}
 
 \newcommand{\typerule}[4]{#1 \triangleright #2 : #3 \triangleleft #4}
 \newcommand{\oprule}[4]{#1 \mid #2\;\longrightarrow\;#3 \mid #4}
@@ -61,7 +73,7 @@
 \newcommand{\falsev}{\mathtt{false}}
 \newcommand{\boolt}{\mathbf{Bool}}
 \newcommand{\funv}[4]{\lambda(\overline{#1 : #2 \gg #3}).#4}
-\newcommand{\funt}[3]{(\overline{(#1 \gg #2) \rightarrow #3}}
+\newcommand{\funt}[3]{(\overline{#1 \gg #2}) \rightarrow #3}
 \newcommand{\lett}[3]{\mathtt{let}\:#1\:\mathtt{=}\:#2\:\mathtt{in}\:#3}
 \newcommand{\ift}[3]{\mathtt{if} \; #1 \; \mathtt{then} \; #2 \; \mathtt{else} \; #3}
 \newcommand{\cand}{\:\wedge\:}
@@ -146,30 +158,128 @@ $\bigsqcup_{S \in \overline{S}}{O@S} = O@S' \sqcup \left(
 By the definition of type join, $O@S' <: O@S' \sqcup \bigsqcup_{S \in \overline{S}}{O@S}$.
 \end{proof}
 
-\begin{lem}[Upgrading]
-If a term $t$ can be typed such that 
-$\typerule{\Gamma, x : T}{t}{U}{\Gamma', x : V}$, and if
-$T' <: T$, then there exists a $V' <: V$ such that
-$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+\begin{lem}
+\label{lem:ssetinc}
+Given an object protocol $O = \left\{ \overline{ S_i \{ ... \} } \right\}$ and two state sets 
+$\overline{S} \subseteq \overline{S'} \subseteq \overline{S_i}$, it follows
+that $O@\overline{S} <: O@\overline{S'}$.
 \end{lem}
 \begin{proof}
-By induction on the structure of $t$.
+From the definition of state sets, we have that 
+$O@\overline{S} = \bigsqcup_{S \in \overline{S}}{O@S}$ and that
+$O@\overline{S'} = \bigsqcup_{S \in \overline{S'}}{O@S}$.
+As $\overline{S} \subseteq \overline{S'}$ there exists an
+$\overline{S''}$ such that $\overline{S'} = \overline{S} \cup \overline{S''}$
+where $\overline{S} \cap \overline{S''} = \emptyset$. Therefore
+$O@\overline{S'} = \left(\bigsqcup_{S \in \overline{S}}{O@S}\right) \sqcup \left(\bigsqcup_{S' \in \overline{S'} - \overline{S}}{O@S'}\right)$.
+
+As $A <: A \sqcup B$ for all $A$ and $B$ where $A \sqcup B$ is defined, 
+it follows that $O@\overline{S} <: O@\overline{S'}$.
+\end{proof}
+
+\begin{lem}
+\label{lem:remap}
+Given types $T$, $U$, and $V$, such that
+$\remapapp{T}{U}{V}$ is defined, it follows that $\remapapp{T}{U}{V} <: V$.
+\end{lem}
+\begin{proof}
+By case analysis of V.
+
+\begin{itemize}
+\item $V = \unitt$ or $V = \boolt$. By either \remapunit or \remapbool
+it must be the case that $U = V$. It must also be the case that
+$T = U$, as $\unitt$ and $\boolt$ do not have any subtypes other than
+themselves. Therefore $V = \remapapp{T}{U}{V} <: V$ by \subrefl.
+
+\item $V = \funv{V_i}{V_i'}{V'}$ for some $\overline{V_i}$, $\overline{V_i'}$
+and $V'$. By \remapfunc, $T <: U$ and $T = \remapapp{T}{U}{V}$. Therefore,
+$T <: V$.
+
+\item $V = O@\overline{S'}$ for some $O$ and $\overline{S'}$. By
+\remapobj, $O'@\overline{S'''} = \remapapp{T}{U}{V}$ where 
+$T = O'@\overline{S''}$ and $U = O@\overline{S}$ and
+$\overline{S'''} = \{ S | O'@S \sim O@\overline{S'}, S \in O' \}$ 
+for some $O'$, $\overline{S}$ and $\overline{S''}$. By \subobj,
+$T = O'@\overline{S'''} <: O@\overline{S'} = V$ as for each $S \in \overline{S'''}$,
+$O'@S <: O@\overline{S'}$.
+\end{itemize}
+\end{proof}
+
+\begin{lem}[Remap is covariant]
+\label{lem:remapcv}
+Given types $T, T', U$ and $V$ such that $T <: T'$, 
+$\remapapp{T}{U}{V} <: \remapapp{T'}{U}{V}$.
+\end{lem}
+
+\begin{lem}
+\label{lem:remapeff}
+Given types $T$, $U$ and $V$ such that $U <: V$ and $T = \remapapp{U}{V}{V}$, 
+it follows that $U <: T$.
+\end{lem}
+\begin{proof}
+By case analysis of the type $V$.
+
+\begin{itemize}
+\item $V = \unitt$ or $V = \boolt$. 
+It must be the case that $V = U$ also, as $\unitt$ and $\boolt$
+have no subtypes other than themselves by rule \subrefl.
+Therefore, by rule \remapunit or \remapbool, $T = V$,
+and $U <: T$ by rule \subrefl.
+
+\item $V = \funv{T_i}{T_i'}{T_r}$ for some $\overline{T_i}$, $\overline{T_i'}$
+and $T_r$. As $U <: V$, it follows by rule \remapfunc that
+$T = U$, and $U <: T$ by \subrefl.
+
+\item $V = O@\overline{S}$ for some $O$ and $\overline{S}$. 
+It follows that $U = O'@\overline{S'}$ 
+for some $O'$ and $\overline{S'}$ 
+such that $O'@\overline{S'} \sim O@\overline{S}$ 
+by rule \subobj. 
+By rule \remapobj, it follows that $T = O'@\overline{S''}$ 
+such that $\overline{S''} = \{ S | O'@S \sim O@\overline{S}, S \in O' \}$.
+By \lemref{lem:ssetinc} it follows that 
+$O'@\overline{S'} <: O'@\overline{S''}$.
+
+\end{itemize}
+\end{proof}
+
+\begin{cor}
+\label{lem:remapsame}
+Given a type $T$, $T <: \remapapp{T}{T}{T}$.
+\end{cor}
+
+\begin{lem}[remap]
+\label{lem:upgrade}
+If a term $t$ can be typed such that 
+$\typerule{\Gamma, x : T}{t}{U}{\Gamma', x : V}$, and if
+$T' <: T$, then there exists a $V' <: \remapapp{T'}{T}{V}$ 
+such that $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+\end{lem}
+\begin{proof}
+by induction on the structure of $t$.
 The term $t$ is of one of the following forms:
 
 \begin{itemize}
 \item $t$ is a value, so by \lemref{lem:valuectx} it follows that
-$\Gamma = \Gamma'$ and $T = V$. Let $V' = T'$.
-The contexts for values can be arbitrary as long
-as they are equal, therefore $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+$\Gamma = \Gamma'$ and $T = V$. 
+The environment can be arbitrary in the typing rules for values,
+therefore we can type $t$ such that 
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : T'}$.
+Let $V' = T'$.
+By \lemref{lem:remapeff}, we have that $V' <: \remapapp{T'}{T}{V}$.
+Therefore, $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
 
 \item $t = \lett{y}{t'}{t''}$. It follows from the rule \tlet that
 $x \neq y$ (as variables cannot be rebound) and that there exists 
-$\Gamma_1, \Gamma_2, T_y, T_y'$ such that
-$\typerule{\Gamma, x : T}{t'}{T_y}{\Gamma_1, x : T_2}$ and
-$\typerule{\Gamma_1, x : T_2, y : T_y}{t''}{U}{\Gamma', x : T_3, y : T_y'}$.
-By induction, it follows that there exists a type $V_2 <: T_2$ such that
+$\Gamma_1, \Gamma_2, T_2, T_y, T_y'$ such that
+$\typerule{\Gamma, x : T}{t'}{T_y}{\Gamma_1, x : T_2}$ and that
+$\typerule{\Gamma_1, x : T_2, y : T_y}{t''}{U}{\Gamma', x : V, y : T_y'}$.
+By induction, it follows that there exists a type $V_2 <: \remapapp{T'}{T}{T_2}$ such that
 $\typerule{\Gamma, x : T'}{t'}{T_y}{\Gamma_1, x : V_2}$.
-As $V_2 <: T_2$, it also follows by induction that
+By \lemref{lem:remap} we have that $V_2 <: T_2$.
+Therefore it also follows by induction that
+there exists a type $V_3 <: \remapapp{V_2}{T_2}{V}$
+such that
 $\typerule{\Gamma_1, x : V_2, y : T_y}{t''}{U}{\Gamma', x : T_3, y : V_3}$.
 Let $V' = V_3$. The rules of \tlet are satisfied such that
 $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
@@ -190,30 +300,32 @@ There are three cases to consider:
 $\Gamma_1 = \Gamma_2, x : T$ for some $\Gamma_2$, that
 $\Gamma = \Gamma_2, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i}$
 and that $\Gamma' = \Gamma_2, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i'}$.
-Additionally, $T = V$. It follows that $t$ can be typed without $x$
-such that $\typerule{\Gamma}{t}{U}{\Gamma'}$. Let $V' = T'$. 
-By the weakening lemma, $\typerule{\Gamma, x : T'}{t}{T}{\Gamma', x : V'}$.
+Additionally, $T = V$. 
+It follows that $t$ can be typed without $x$
+such that $\typerule{\Gamma}{t}{U}{\Gamma'}$. Let $V' = T'$.
+By the weakening lemma, $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+By \lemref{lem:remapeff}, $V' <: \remapapp{T'}{T}{V}$.
 
 \item $x = y$, meaning $\Gamma = \Gamma_1, \overline{z_i : T_i}$ and
 $\Gamma' = \Gamma_1, \overline{z_i : T_i'}$. 
 Additionally, $T = V = \funt{U_i}{V_i}{U}$.
 $T'$ must therefore be of form $\funt{U_i'}{V_i'}{U'}$ 
 such that for each $i$, $U_i <: U_i'$, $V_i' <: V_i$, $U' <: U$ by the
-definition of subtyping. Let $V' = T'$. 
+definition of subtyping. Let $V' = T'$.
+By \lemref{lem:remapeff}, $V' <: \remapapp{T'}{T}{V}$.
 It follows by rule \tfunc, and \tsub to replace $U'$ with $U$, that
-$\typerule{\Gamma, x : T'}{x ( \overline{z_i})}{U}{\Gamma', x : V'}$.
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
 
 \item $x \in \overline{z_i}$, meaning that $T = T_i$ and 
-$V = T_i' = remap(T, U_i >> V_i)$ for some $i$. 
-Let $V' = remap(T', U_i >> V_i)$.
-The rule \tfunc permits $T$ to be replaced with $T'$
-as $T' <: T$, such that
-% MUST SHOW V' <: V$.
-$\typerule{\Gamma, x : T'}{y ( \overline{z_i} )}{U}{\Gamma, x : V'}$.
+$V = T_i' = \remapapp{T}{U_i}{V_i}$ for some $i$.
+Let $V' = \remapapp{T'}{U_i}{V_i}$. 
+By \lemref{lem:remapcv}, $V' <: V$.
+As $T' <: T$, we can type $t$ by rule \tfunc such that
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma, x : V'}$.
 
 \end{itemize}
 
-\item $t = y.m$. By the rule $\tmethc$ it follows that
+\item $t = y.m$. By the rule \tmethc it follows that
 $\Gamma, x : T = \Gamma_1, y : O@\overline{S}$
 and that
 $\Gamma', x : V = \Gamma_1, y : O@\overline{S'}$
@@ -228,9 +340,9 @@ There are two cases to consider:
 \item $x = y$. It follows that $\Gamma = \Gamma_1 = \Gamma'$ and
 that $T = O@\overline{S}, V = O@\overline{S'}$.
 $T'$ must be of form $O'@\overline{S}''$ such that
-$O'@\overline{S}'' \sim O@\overline{S}$ by the definition of subtyping. 
+$O'@\overline{S}'' \sim O@\overline{S}$ by rule \subobj.
 
-Let $V' = O'@\overline{S}'''$
+Let $V' = O'@\overline{S}''' = \remapapp{T'}{T}{V}$
 where
 $S''' = \{ S_n' | m : T_r' \Rightarrow S_n' \in O'@S'', S'' \in \overline{S}''\}$.
 Let $U' = \bigsqcup{ \{ T_r' | m : T_r' \Rightarrow S_n' \in O'@S'', S'' \in \overline{S}'' \} }$.
@@ -242,20 +354,24 @@ $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
 
 \item $x \neq y$. It follows that $\Gamma = \Gamma'', y : O@\overline{S}$
 and that $\Gamma' = \Gamma'', y : O@\overline{S'}$
-for some $\Gamma''$, $O$ and $\overline{S}$.
-It follows that $\typerule{\Gamma}{t}{U}{\Gamma'}$.
-Let $V' = T'$. By the weakening lemma, 
+for some $\Gamma''$, $O$ and $\overline{S}$, and that
+$T = V$.
+By rule \tmethc we have that $\typerule{\Gamma}{t}{U}{\Gamma'}$.
+Let $V' = T'$. By \lemref{lem:remapeff}, $V' <: \remapapp{T'}{T}{V}$.
+By the weakening lemma, 
 $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+
 \end{itemize}
 
 \item $t = t' ; t''$. It follows by rule \tlet that there exists
 $\Gamma'', V_{mid}, U'$ 
 such that $\typerule{\Gamma, x : T}{t'}{U'}{\Gamma'', x : V_{mid}}$
 and that $\typerule{\Gamma'', x : V_{mid}}{t''}{U}{\Gamma', x : V}$.
-By induction, it follows that there exists $V_{mid}'$ 
+By induction, it follows that there exists $V_{mid}' <: \remapapp{T'}{T}{V_{mid}}$ 
 such that $\typerule{\Gamma, x : T'}{t'}{U'}{\Gamma'', x : V_{mid}'}$.
-It also follows by induction that there exists $V_{end} <: V$
-such that
+By \lemref{lem:remap} we have that $V_{mid}' <: V_{mid}$.
+There it also follows by induction that 
+there exists $V_{end} <: \remapapp{V_{mid}'}{V_{mid}}{V}$ such that
 $\typerule{\Gamma'', x : V_{mid}'}{t''}{U}{\Gamma'', x : V_{end}}$.
 Let $V' = V_{end}$. By rule \tlet it follows that
 $\typerule{\Gamma, x : T'}{t' ; t''}{U}{\Gamma'', x : V'}$.
@@ -270,10 +386,15 @@ $\typerule{\Gamma_1, x : V_c}{t_f}{U_f}{\Gamma_3, x : V_f}$ with
 $\Gamma' = \Gamma_2 \sqcup \Gamma_3$, $U = U_t \sqcup U_f$ and
 $V = V_t \sqcup V_f$.
 
-By induction, there exists a $V_c' <: V_c$, $V_t' <: V_t$ and $V_f' <: V_f$ 
-such that $\typerule{\Gamma, x : T'}{t_c}{\boolt}{\Gamma_1, x : V_c'}$
-and that $\typerule{\Gamma_1, x : V_c'}{t_t}{T_t}{\Gamma_2, x : V_t'}$
+By induction, there exists a $V_c' <: \remapapp{T'}{T}{V_c}$
+such that $\typerule{\Gamma, x : T'}{t_c}{\boolt}{\Gamma_1, x : V_c'}$.
+By \lemref{lem:remap} we also have that $V_c' <: V_c$.
+Therefore by induction there also exists a 
+$V_t' <: \remapapp{V_c'}{V_c}{V_t}$ and $V_f' <: \remapapp{V_c'}{V_c}{V_f}$
+such that $\typerule{\Gamma_1, x : V_c'}{t_t}{T_t}{\Gamma_2, x : V_t'}$
 and that $\typerule{\Gamma_1, x : V_c'}{t_f}{T_f}{\Gamma_3, x : V_f'}$.
+By \lemref{lem:remap} we also have that $V_t' <: V_t$ and that
+$V_f' <: V_f$.
 Let $V' = V_t' \sqcup V_f'$. By the definition of join, $V' <: V$.
 It follows by rule \tif that
 $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
@@ -368,7 +489,7 @@ $\typerule
 where each $x_i$ and $y_i$ is distinct, and $\overline{x_i} \cap \overline{y_i} = \emptyset$.
 \end{lem}
 \begin{proof}
-By induction on the structure of $t$.
+by induction on the structure of $t$.
 
 If $t$ is some value $v$, then $\Gamma = \Gamma'$, therefore
 $\subst{x_i}{y_i}{\Gamma} = \subst{x_i}{y_i}{\Gamma'}$
@@ -494,7 +615,7 @@ possibilities:
 
 	\item If $t''$ is a term, 
 	by induction we have that $\oprule{t''}{\mu}{t'''}{\mu'}$, with
-	$\Gamma'' \vdash \mu'$ and $\typerule{\Gamma''}{t'''}{T'}{\Gamma_1}$.
+	some $\Gamma'' \vdash \mu'$ and $\typerule{\Gamma''}{t'''}{T'}{\Gamma_1}$.
 	This satisfies the requirements of \rlett, meaning $t$ itself can reduce
 	such that $\oprule{\lett{x}{t''}{t'}}{\mu}{\lett{x}{t'''}{t'}}{\mu'}$.
 	Additionally, the conditions of \tlet are satisfied such that
@@ -535,27 +656,31 @@ where $T_i' = \mathbf{remap} ( T_i, U_i >> V_i )$.
 As $\Gamma \vdash \mu$, 
 it follows that $\mu(x) = \funv{y_i}{U_i'}{V_i'}{t'}$
 where $\typerule{\overline{y_i : U_i'}}{t'}{T'}{\overline{y_i : V_i'}}$,
-with $\funt{U_i'}{V_i'}{T'} <: \funt{U_i}{V_i}{T}$.
-Additionally, $\mu(x_i) = v_i$ such that 
+with $\funt{U_i'}{V_i'}{T'} <: \funt{U_i}{V_i}{T}$. It
+follows by \subfn that for each $i$, $U_i <: U_i'$, $V_i' <: V_i$
+and $T' <: T$.
+Additionally for each $x_i$, $\mu(x_i) = v_i$ such that 
 $\typerule{\emptyset}{v_i}{T_i''}{\emptyset}$ 
-where $T_i'' <: T_i$ for each $x_i$.
+where $T_i'' <: T_i$.
 
 Let $t_{sub} = \subst{x_i}{y_i}{t'}$.
 The term $t$ can be reduced by \rfunc such that
 $x ( \overline{x_i} ) \mid \mu \longrightarrow t_{sub} \mid \mu$.
 By the substitution lemma, 
-$\typerule{\overline{x_i : U_i'}}{t'}{T'}{\overline{x_i : V_i'}}$.
-By applying the rules \tnarrow, \twiden and \tsub, it follows that
-$\typerule{\overline{x_i : T_i}}{t'}{T}{\overline{x_i : V_i}}$
-as $T_i <: U_i <: U_i'$ and $V_i' <: V_i$.
+$\typerule{\overline{x_i : U_i'}}{t_{sub}}{T'}{\overline{x_i : V_i'}}$.
+By lemma \lemref{lem:upgrading}, it follows that
+for each $i$, there exists a $V_i'' = \remapapp{T_i''}{U_i'}{V_i'}$
+such that 
+$\typerule{\overline{x_i : U_i}}{T_{sub}}{T'}{\overline{x_i : V_i''}}$.
+By \lemref{lem:remap} for each $i$ that $V_i'' <: V_i'$.
 
-% NEED V_i <: T_i' to apply \twiden again.
+Therefore, by given that $T_i <: U_i$ and that $V_i'' <: V_i' <: V_i$
+and that $T' <: T$ we can apply \tnarrow, \twiden and \tsub
+such that $\typerule{\overline{x_i : T_i}}{t'}{T}{\overline{x_i : V_i}}$.
 
-Let $\mu' = \mu$. Let $\Gamma'' = \Gamma$. 
-
-By applying the weakening lemma, we can type $t''$ such that
-$\typerule{\Gamma''}{t''}{T}{\Gamma'}$,
-with $\Gamma'' \vdash \mu'$.
+Let $\mu' = \mu$. Let $\Gamma'' = \Gamma$. It follows that 
+$\Gamma'' \vdash \mu'$. By applying the weakening lemma, we can type 
+$t_{sub}$ such that $\typerule{\Gamma''}{t''}{T}{\Gamma'}$.
 
 \item $t = x.m$. It follows by rule \tmethc that
 $\Gamma = \Gamma_1, x : O@\overline{S}$ and that 
@@ -565,7 +690,9 @@ As
 $\Gamma \vdash \mu$, we must have $\mu = \mu_1, x \mapsto o'@S_c$ with
 $\Gamma_1 \vdash \mu_1$ and where
 $\typerule{\emptyset}{o'@S_c}{O'@S_c}{\emptyset}$ such that
-$O'@S_c <: O@\overline{S}$. By the definition of subtyping for object types,
+$O'@S_c <: O@\overline{S}$. 
+
+By the definition of subtyping for object types,
 we must have that
 $o' = [ S' \{ m = (v,S_n) ; ... \} ... ]$, where $O'@S_n <: O@\overline{S'}$. 
 Where the value $v$ is concerned, $\typerule{\emptyset}{v}{T'}{\emptyset}$
@@ -575,9 +702,7 @@ Therefore reduction can occur by \rmethc such that
 $x.m \mid \mu_1, x \mapsto o@S \longrightarrow v \mid \mu_1, x \mapsto o@S_n$.
 Let $\mu' = \mu_1, x \mapsto o@S'$. Let $\Gamma'' = \Gamma'$. It follows that
 $\Gamma'' \vdash \mu'$, as $O'@S_n <: O@\overline{S'}$. 
-By application of the weakening lemma, we have that
-$\typerule{\Gamma'}{v}{T'}{\Gamma'}$ and by rule \tsub and that
-$\Gamma'' = \Gamma'$ we therefore have that 
+By application of the weakening lemma and rule \tsub, it follows that
 $\typerule{\Gamma''}{v}{T}{\Gamma'}$.
 
 \item $t = \ift{t_c}{t_t}{t_f}$. It follows by rule \tif that there exists
@@ -594,7 +719,7 @@ three possibilities for reduction:
 	$\oprule{t}{\mu}{t_t}{\mu}$. By \tsub we have that
 	$\typerule{\Gamma_1}{t_t}{T}{\Gamma_2}$ as $T_t <: T$. Additionally, for
 	all $x \in \Gamma_2$, $\Gamma_2(x) <: \Gamma'(x)$. Therefore by
-	repeatedly applying \tsubctx for all $x$, we have that
+	repeatedly applying \twiden for all $x$, we have that
 	$\typerule{\Gamma_1}{t_t}{T}{\Gamma'}$.
 	Let $\Gamma'' = \Gamma$, $\mu' = \mu$ and 
 	$t' = t_t$. Therefore, $\typerule{\Gamma''}{t'}{T}{\Gamma'}$ with
@@ -605,15 +730,15 @@ three possibilities for reduction:
 	$\oprule{t}{\mu}{t_f}{\mu}$. By \tsub we hhave that
 	$\typerule{\Gamma_1}{t_f}{T}{\Gamma_3}$ as $T_f <: T$. Additionally, for
 	all $x \in \Gamma_3$, $\Gamma_3(x) <: \Gamma'(x)$. Therefore by
-	repeatedly applying \tsubctx for all $x$, we have that
+	repeatedly applying \twiden for all $x$, we have that
 	$\typerule{\Gamma_1}{t_f}{T}{\Gamma'}$. Let $\Gamma'' = \Gamma$,
 	$\mu' = \mu$ and $t' = t_f$. Therefore, 
 	$\typerule{\Gamma''}{t'}{T}{\Gamma'}$ with $\Gamma'' \vdash \mu'$.
 
 	\item $t_c$ is not a value. By induction, there exists $t_c'$,
 	$\mu'$, $\Gamma''$ such that 
-	$\oprule{t_c}{\mu}{t_c}{\mu'}$ and 
-	$\typerule{\Gamma''}{t_c}{\boolt}{\Gamma_1}$ with $\Gamma'' \vdash \mu'$. 
+	$\oprule{t_c}{\mu}{t_c'}{\mu'}$ and 
+	$\typerule{\Gamma''}{t_c'}{\boolt}{\Gamma_1}$ with $\Gamma'' \vdash \mu'$. 
 	Reduction of $t$ can therefore occur by \rifexpr such that
 	$\oprule{t}{\mu}{\ift{t_c'}{t_t}{t_f}}{\mu'}$. It follows
 	by \tif that $\typerule{\Gamma''}{\ift{t_c'}{t_t}{t_f}}{T}{\Gamma'}$.
