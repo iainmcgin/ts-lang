@@ -1,5 +1,8 @@
 .PHONY: clean
 
+paper.pdf: paper.tex ts_defns.tex principal.pdf sm1.pdf simulation.pdf
+	latexmk -pdf paper.tex
+
 ts_proofs.pdf: ts_proofs.tex ts_defns.tex
 	latexmk -pdf ts_proofs.tex
 

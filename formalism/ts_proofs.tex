@@ -63,8 +63,8 @@
 
 \newcommand{\typerule}[4]{#1 \triangleright #2 : #3 \triangleleft #4}
 \newcommand{\oprule}[4]{#1 \mid #2\;\longrightarrow\;#3 \mid #4}
-\newcommand{\inferrule}[4]{\llbracket #1 \triangleright #2 : #3 \triangleleft #4 \rrbracket}
-\newcommand{\inferlhs}[1]{\llbracket \gamma \triangleright #1 : \alpha \triangleleft \gamma' \rrbracket}
+\newcommand{\inferrule}[4]{\left\llbracket #1 \triangleright #2 : #3 \triangleleft #4 \right\rrbracket}
+\newcommand{\inferlhs}[1]{\left\llbracket \gamma \triangleright #1 : \alpha \triangleleft \gamma' \right\rrbracket}
 \newcommand{\subst}[3]{#3 \{\overline{^{#1}/_{#2}}\}}
 \newcommand{\substxy}[1]{\subst{x_i}{y_i}{#1}}
 \newcommand{\unitv}{\mathtt{unit}}
@@ -149,13 +149,18 @@ Correspondingly, by rules \tunit,
 \end{proof}
 
 \begin{lem}[Object state sets]
-An object type $O@S'$ is a subtype of $O@\overline{S}$ when $S' \in \overline{S}$.
+Given an object state set $\overline{S}$ and a state $S'$, if
+$S' \in \overline{S}$ then $O@S' <: O@\overline{S}$.
 \end{lem}
 \begin{proof}
-Let $S' \in \overline{S}$. The definition of $O@\overline{S}$ is
-$\bigsqcup_{S \in \overline{S}}{O@S} = O@S' \sqcup \left( 
-\bigsqcup_{S \in \overline{S} - \{ S' \}}{O@S} \right)$. 
-By the definition of type join, $O@S' <: O@S' \sqcup \bigsqcup_{S \in \overline{S}}{O@S}$.
+$O@\overline{S}$ is defined as equivalent to
+$\bigsqcup_{S \in \overline{S}}{O@S}$. Given that $S \in \overline{S}$,
+we must have that $\overline{S} = \overline{S'} \cup \{ S \}$ for
+some $\overline{S'}$.
+it follows that $O@\overline{S} = O@S' \sqcup \left( 
+\bigsqcup_{S \in \overline{S'}}{O@S} \right)$.
+By the definition of join, 
+$O@S' <: O@S' \sqcup \bigsqcup_{S \in \overline{S}}{O@S}$.
 \end{proof}
 
 \begin{lem}
@@ -759,6 +764,7 @@ defined in Section \ref{sec:typerules}.
 \ottctxc\ottinterrule
 \otttyc\ottinterrule
 \ottprotoc\ottinterrule
+\otttinf\ottinterrule
 }
 
 \[
@@ -777,12 +783,12 @@ defined in Section \ref{sec:typerules}.
 \\\\
 
 % object value
-\inferlhs{[ \overline{S_i \{ \overline{ m_{ij} = (v_{ij}, S_{ij}) } \} }]@S}
+\inferlhs{\left[ \overline{S_i \left\{ \overline{ m_{ij} = (v_{ij}, S_{ij}) } \right\} } \right]@S}
 \triangleq
 \exists \alpha_o, \alpha_s, \overline{\alpha_{ij}}, \overline{\gamma_{ij}} . \\
 \alpha = \alpha_o@\alpha_s
 \cand
-\{ \overline{ S_i \{ \overline{ m_{ij} : \alpha_{ij} >> S_{ij} } \} }\}@S <: \alpha_o@\alpha_s
+\left\{ \overline{ S_i \left\{ \overline{ m_{ij} : \alpha_{ij} >> S_{ij} } \right\} }\right\}@S <: \alpha_o@\alpha_s
 \cand
 \gamma = \gamma'
 \cand
@@ -817,18 +823,6 @@ defined in Section \ref{sec:typerules}.
 \inferrule{\gamma}{t'}{\alpha'}{\gamma_v}
 \cand
 \inferrule{\gamma_{b1}}{t}{\alpha}{\gamma_{b2}}
-\\\\
-
-% update
-\inferlhs{x\:\mathtt{:=}\:t'} \triangleq
-\exists \gamma_a, \gamma_b, \alpha' . \\
-\gamma_a = \gamma - \{ x \}
-\cand
-\gamma' = \gamma_b, x \mapsto \alpha'
-\cand 
-\alpha = \unitt
-\cand \\
-\inferrule{\gamma_a}{t'}{\alpha'}{\gamma_b}
 \\\\
 
 % sequence

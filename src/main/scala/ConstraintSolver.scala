@@ -81,9 +81,13 @@ class ConstraintSolver(t : Term) {
 
     val (contexts, eqConstraints, subConstraints) = 
       reduceToTypeConstraints(constraints)
+
+    val stubbedJoins = constraints.jcs.flatMap(jc => 
+      Seq(EqualityConstraint(jc.a, jc.left), 
+        EqualityConstraint(jc.a, jc.right)))
     
     solveTypeConstraints(contexts, 
-      eqConstraints, 
+      eqConstraints ++ stubbedJoins, 
       subConstraints,
       constraints.mcs)
   }

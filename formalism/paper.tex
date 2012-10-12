@@ -1,0 +1,1931 @@
+\documentclass[preprint]{sigplanconf}
+
+% The following \documentclass options may be useful:
+%
+% 10pt          To set in 10-point type instead of 9-point.
+% 11pt          To set in 11-point type instead of 9-point.
+% authoryear    To obtain author/year citation style instead of numeric.
+
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{proof}
+\usepackage{supertabular}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\usepackage{theorem}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{mathtools}
+
+\newtheorem{lem}{Lemma}
+\newtheorem{thm}{Theorem}
+\newtheorem{defn}{Definition}
+\newtheorem{cor}{Corollary}
+
+\newcommand{\Tr}{\mathit{Tr}}
+\newcommand{\secref}[1]{Section \ref{#1}}
+\newcommand{\figref}[1]{Figure \ref{#1}}
+\newcommand{\lstref}[1]{Listing \ref{#1}}
+\newcommand{\appref}[1]{Appendix \ref{#1}}
+\newcommand{\lemref}[1]{Lemma \ref{#1}}
+\newcommand{\corref}[1]{Corollary \ref{#1}}
+
+\newcommand{\rlett}{\textsc{r\_let\_term} }
+\newcommand{\rletv}{\textsc{r\_let\_value} }
+\newcommand{\rseqlt}{\textsc{r\_seq\_left\_term} }
+\newcommand{\rseqlv}{\textsc{r\_seq\_left\_value} }
+\newcommand{\rfunc}{\textsc{r\_fun\_call} }
+\newcommand{\rmethc}{\textsc{r\_meth\_call} }
+\newcommand{\rifexpr}{\textsc{r\_if\_term} }
+\newcommand{\riftrue}{\textsc{r\_if\_true} }
+\newcommand{\riffalse}{\textsc{r\_if\_false} }
+
+\newcommand{\tunit}{\textsc{t\_unit} }
+\newcommand{\ttrue}{\textsc{t\_true} }
+\newcommand{\tfalse}{\textsc{t\_false} }
+\newcommand{\tobj}{\textsc{t\_object} }
+\newcommand{\tfundef}{\textsc{t\_fun\_def} }
+\newcommand{\tlet}{\textsc{t\_let} }
+\newcommand{\tif}{\textsc{t\_if} }
+\newcommand{\tseq}{\textsc{t\_seq} }
+\newcommand{\tfunc}{\textsc{t\_fun\_call} }
+\newcommand{\tmethc}{\textsc{t\_meth\_call} }
+\newcommand{\tdrop}{\textsc{t\_drop} }
+\newcommand{\tsub}{\textsc{t\_sub} }
+\newcommand{\tnarrow}{\textsc{t\_narrow} }
+\newcommand{\twiden}{\textsc{t\_widen} }
+
+\newcommand{\subrefl}{\textsc{sub\_refl}}
+\newcommand{\subtrans}{\textsc{sub\_trans}}
+\newcommand{\subfn}{\textsc{sub\_fn}}
+\newcommand{\subobj}{\textsc{sub\_obj}}
+
+\newcommand{\remapunit}{\textsc{remap\_unit}}
+\newcommand{\remapbool}{\textsc{remap\_bool}}
+\newcommand{\remapfunc}{\textsc{remap\_func}}
+\newcommand{\remapobj}{\textsc{remap\_obj}}
+
+\newcommand{\remapapp}[3]{\ensuremath{\mathbf{remap}(#1, #2 \gg #3)}}
+
+\newcommand{\typerule}[4]{#1 \triangleright #2 : #3 \triangleleft #4}
+\newcommand{\oprule}[4]{#1 \mid #2\;\longrightarrow\;#3 \mid #4}
+\newcommand{\inferrule}[4]{\left\llbracket #1 \triangleright #2 : #3 \triangleleft #4 \right\rrbracket}
+\newcommand{\inferlhs}[1]{\left\llbracket \gamma \triangleright #1 : \alpha \triangleleft \gamma' \right\rrbracket}
+\newcommand{\subst}[3]{#3 \{\overline{^{#1}/_{#2}}\}}
+\newcommand{\substxy}[1]{\subst{x_i}{y_i}{#1}}
+\newcommand{\unitv}{\mathtt{unit}}
+\newcommand{\unitt}{\mathbf{Unit}}
+\newcommand{\truev}{\mathtt{true}}
+\newcommand{\falsev}{\mathtt{false}}
+\newcommand{\boolt}{\mathbf{Bool}}
+\newcommand{\ot}[2]{#1@\overline{#2}}
+\newcommand{\funv}[4]{\lambda(\overline{#1 : #2 \gg #3}).#4}
+\newcommand{\funt}[3]{(\overline{#1 \gg #2}) \rightarrow #3}
+\newcommand{\lett}[3]{\mathtt{let}\:#1\:\mathtt{=}\:#2\:\mathtt{in}\:#3}
+\newcommand{\ift}[3]{\mathtt{if} \; #1 \; \mathtt{then} \; #2 \; \mathtt{else} \; #3}
+\newcommand{\cand}{\:\wedge\:}
+\newcommand{\free}[1]{\mathbf{free}\:#1}
+\newcommand{\fresh}[1]{\mathbf{fresh}\:#1}
+
+\newcommand{\qed}{$\blacksquare$}
+
+\newenvironment{proof}{\vspace{1ex}\noindent{\bf Proof}\hspace{0.5em}}
+  {\hfill\qed\vspace{1ex}}
+
+\lstset{
+    basicstyle=\ttfamily \small,
+    numbers=left,
+    frame=single,
+    tabsize=2,
+    xleftmargin=2.0em,
+    xrightmargin=0.4em
+}
+
+\input{ts_defns}
+
+\begin{document}
+
+\conferenceinfo{TBD}{TBD} 
+\copyrightyear{2012} 
+\copyrightdata{[to be supplied]} 
+
+\titlebanner{IN-PROGRESS WORK}        % These are ignored unless
+\preprintfooter{DO NOT REDISTRIBUTE WITH PERMISSION}   % 'preprint' option specified.
+
+\title{Typestate Inference in an Imperative Calculus}
+
+\authorinfo{Iain McGinniss \and Simon Gay}
+           {University of Glasgow}
+           {\{iainmcgin, simon\}@dcs.gla.ac.uk}
+
+\maketitle
+
+\begin{abstract}
+Current typestate research is primarily focused on studying
+type systems that can support particular use cases for typestate;
+the type systems are often complex, and programs in such languages 
+require large type annotations to allow for full static type checking. Little
+work has been done to determine whether inference of such annotations is 
+feasible. We present a small imperative calculus which
+models interactions with typestate-constrained objects and a type inference
+technique which can derive the minimal state machine that governs interactions
+with the observed objects, and therefore eliminate the need for
+explicit type annotations.
+\end{abstract}
+
+\category{D.2.4}{Software Engineering}{Programming by contract}
+\category{F.3.3}{Studies of Program Constructs}{Type structure}
+\category{D.1.5}{Object-oriented Programming}{}
+\category{D.3.1}{Programming Languages}{Formal Definitions and Theory}
+
+\keywords
+typestate, type inference, constraint solving, alias control
+
+\section{Introduction}
+
+Typestate is ubiquitous in object oriented programs \cite{Beckman2011} and yet
+very few languages provide direct support for it. Stateful objects are a source
+of subtle runtime errors when their contracts are not respected, as the
+point of failure is often separated from the cause in both source location
+and time. As such the use of immutable objects and the 
+borrowing of ideas from functional programming has become much more prevalent, 
+such as in languages like Scala and Rust \cite{Rust}.
+
+Immutability runs contrary to what objects were intended to be --- objects in
+their most fundamental form can be viewed as entities with private state and 
+associated protocols, which specify the messages the entities can respond to.
+An immutable object, meaning an object with constant private state and
+a stateless protocol, has much more in common with a type constructor in 
+a functional language.
+
+An object may have a very simple 
+protocol, where the set of messages (or equivalently, method calls) it is 
+willing to accept is constant throughout its lifecycle --- this is what the 
+type system of programming languages such as Java can express. This is
+insufficient to correctly model the object's behaviour in many cases, as
+the set of messages the object can correctly respond to is dependent upon an
+abstraction of its private state. State change is typically synchronous, in 
+response to message receipt, and safety requires that 
+any message sent to an object is within the set which can be received for
+the currently known state. 
+
+Describing the allowed sequence of messages which a class of objects can
+receive, their typestate, produces significantly more complex types than
+in an object oriented language without typestate constraints. Functions which
+take objects as parameters must describe the type of object they accept,
+in which state, and what state transformation will occur (which may not
+be deterministic). This type annotation burden is particularly pronounced
+in a language with function literals, which must be succinct
+in order to be readable.
+
+Additionally, static checking of typestate requires
+that the current state of an object always be known at a point of invocation.
+This is only possible when an alias control strategy is employed, such as linear types, 
+but such types prohibit programming in a style that most programmers are 
+familiar with. Attempting to relax linear typing through the use of fractional 
+permissions as in Plural and Plaid \cite{Aldrich2009,Bierhoff2009}
+adds a significant amount of complexity to the type system. This results in 
+large type annotations within programs to express both typestate and aliasing 
+constraints when modular static type checking is desired.
+If it were possible to eliminate the need for such type annotations, code
+could be more concise and type annotations would only be necessary for
+documentation purposes, and could be checked that they are simply more specific
+versions of the principal typing produced by the type inference algorithm.
+
+\section{Modelling typestate constraints}
+\label{sec:tsmodel}
+
+In previous work \cite{McGinniss2011}, we have taken the view that most use 
+cases for typestate can be adequately modelled by a deterministic
+finite state machine. The state machine explicitly describes the
+states of the object, the methods which can be called in each state and
+the transition triggered by a method call in a specific state.
+Fields on the object can either be treated as private or as a special case
+of method invocation \cite{Abadi1996}. For simplicity
+we will only consider methods with no parameters, as there are very few
+use cases where the values of parameters have an effect on state transition 
+decisions which could be described without the integration of much more
+complex features into the model, such as range types, conditional transitions
+or a full logical framework.
+
+The type of a given object at any point in time can be described as the
+combination of a state machine (which we will refer to as the 
+{\it object protocol}) and a particular state from within that protocol.
+We write this as $O@S$, where $O$ is the protocol and $S$ is the state.
+Formally, an object protocol $O$ is defined as a triple
+$\langle M, \Sigma, \Delta \rangle$ where $M$ is a set of all
+method names, $\Sigma$ is the set of state labels and
+$\Delta \subseteq \Sigma \times M \times \Sigma$ is the state
+transition relation. Transitions for a given state must be unique, such that 
+$(S, m, S') \in \Delta \implies \nexists S'' \:\mathrm{st.}\: S' \neq S'' 
+\wedge (S, m, S'') \in \Delta$.
+
+The subtyping relation $<:$ is defined in terms of a
+{\it simulation preorder}. Given $O = \langle M, \Sigma, \Delta \rangle$ and
+$O_2 = \langle M_2, \Sigma_2, \Delta_2 \rangle$, the simulation preorder
+$\sim$
+is defined to be the largest relation such that if $O@S \sim O_2@S_2$ then for all
+$m$ and $S_4$ such that $(S_2, m, S_4) \in \Delta_2$ there exists an $S_3$ such that
+$(S, m, S_3) \in \Delta$ and that $O@S_3 \sim O_2@S_4$.
+Subtyping is defined such that $O@S <: O_2@S_2 \iff O@S \sim O_2@S_2$.
+
+A perhaps more intuitive basis for subtyping
+uses the notion of {\it trace inclusion}. The set of interaction traces 
+$\Tr(O@S)$ of a type is the smallest set such that:
+
+\[
+\begin{tabular}{cc}
+\infer{\epsilon \in \Tr(O@S)}{}
+&
+\infer{m . t \in \Tr(O@S)}
+{(S, m, S') \in \Delta & t \in \Tr(O@S')}
+\end{tabular}
+\]
+
+where $\epsilon$ is the empty trace, and $m . t$ is the 
+prefixing of an existing trace with a method call.
+Subtyping is therefore defined such that
+$O@S <: O_2@S_2 \iff \Tr(O_2@S_2) \subseteq \Tr(O@S)$. 
+
+It is easy to
+show that $O@S \sim O_2@S_2 \iff \Tr(O_2@S_2) \subseteq \Tr(O@S)$, so these
+interpretations of subtyping can be used interchangeably wherever necessary.
+
+Either view of subtyping is also easy to relate to the Liskov substitution 
+principle \cite{Liskov1987} --- a type will accept every sequence of
+method calls that a supertype would, therefore it is a {\it behavioural}
+subtype.
+
+\section{TS - an imperative calculus with typestate}
+
+TS is a small imperative calculus which models interactions with 
+typestate-constrained objects, supports function literals without 
+implicit capture, and employs structural subtyping for function and object
+types.
+The grammar of the language is shown 
+in \figref{fig:grammar}, with operational semantics in \figref{fig:opsemantics} 
+and typing rules in \figref{fig:typerules}.
+The language is designed primarily
+to study typestate inference in imperative code, rather than to 
+be practical, as it uses syntactic control of interference \cite{Reynolds1978} 
+to avoid the issue of alias control entirely - there is no means within the
+language to produce an alias to an object.
+
+The language has the following values:
+
+\begin{itemize}
+\item {\tt unit}, the sole value of the {\tt Unit} type, which is used as
+the result type for terms which have no meaningful result.
+\item Function literals, which do not allow for implicit capture
+of variables into their scopes --- everything must be passed as a parameter.
+Tracking effects on implicitly captured references is not very well
+studied in the current literature outside of strict linear types where
+function literals that capture linear references must themselves be linear.
+Parameters are passed by reference. 
+Requiring that all references be explicitly passed to the function allows for
+effects to be explicitly declared. The notation $T \gg T'$ is used to
+describe an {\it effect type}, which declares a required type for the parameter 
+on the left, and the new type of the parameter after application of the function 
+on the right. Not all effect types are legal, as will be discussed later.
+\item Object literals. These are composed of a state machine description
+and a current state. The state machine description contains a set of
+distinct state labels $\overline{S_i}$, within which is a set of methods $\overline{m_{ij}}$ 
+which can be called in that state. The language does
+not attempt to fully model the behaviour of objects, only interactions with
+them. As such, it is sufficient for each method to be defined as a pair 
+consisting of the return value of the method, and the next state of the object 
+if the method is invoked. Non-determinism in the production of a return value 
+could be simulated by specifying a set of possible return values and allowing 
+the operational semantics to select one of these randomly.
+All values would have to have the same type, or types for which a least upper 
+bound exists. Such non-determinism would have no effect on the type system,
+which is the main focus of this paper.
+\end{itemize}
+
+\noindent
+The language has the following terms:
+
+\begin{itemize}
+\item A conditional of form $\ift{t_c}{t_t}{t_f}$, which evaluates
+$t_c$ first to a boolean result which decides which of $t_t$ 
+(the \"true\" branch) or $t_f$ (the \"false\" branch) is
+evaluated.
+\item Function calls of form $x(\overline{x_i})$, which extract the function
+literal stored in $x$ and apply it to the set of parameters $\overline{x_i}$,
+which must match the declared parameter types. Each $x_i$ must be a distinct
+variable, and is passed by reference, allowing the type of $x_i$ to be changed
+as a result of the function application.
+\item Method invocations on objects of form $x.m$. A method call is only
+valid when the method is available in the current state of the object stored
+in $x$. After a valid invocation, the state of the object will have changed
+as specified by the object's state machine.
+\item A let-bind construct $\lett{x}{t}{t'}$, which creates a new variable
+$x$ within the scope of the body term $t'$ which is a reference to the value
+derived from the term $t$. Rebinding a variable name is not allowed.
+\item Sequencing of form $\tseq{t}{t'}$, which evaluates terms in 
+left-to-right order.
+\end{itemize}
+
+While variables are references to a value, there is no construct which
+can duplicate a reference. This very simple mechanism
+ensures that references are unique, allowing us to focus our attention on the
+typestate properties of objects without the added complication of alias
+control annotations in the types. The restriction that each variable passed to
+a function be unique is for this reason, to prevent implicit duplication
+by passing the same variable more than once to the same function.
+
+\begin{figure}
+
+\ottgrammartabular{
+\ottt\ottinterrule
+\ottv\ottinterrule
+\otto\ottinterrule
+\ottT\ottinterrule
+\ottO\ottinterrule
+}
+
+\caption{\label{fig:grammar} Grammar of TS0}
+\end{figure}
+
+The example in \figref{fig:exampleprog} shows a short TS0 program
+that TODO.
+
+\begin{figure}
+\begin{lstlisting}
+TODO
+\end{lstlisting}
+\caption{\label{fig:exampleprog} An example program in TS0}
+\end{figure}
+
+\subsection{Stores}
+
+Each variable is a unique reference to a value in a store $\mu$, which is 
+defined as $\mu\:\mathrm{::=}\:\overline{x_i \mapsto v_i}$ where each $x_i$ is
+distinct. A store location
+is created (or overwritten) upon entry to the body of a let-binding, written as
+$\mu[x \mapsto v]$, which is defined as follows:
+
+\[
+\begin{tabular}{cc}
+\infer
+{\mu[x \mapsto v] = \mu, x \mapsto v}
+{\mu = \overline{x_i \mapsto v_i} & x \notin \overline{x_i}}
+&
+\infer
+{\mu[x \mapsto v] = \mu, x \mapsto v}
+{\mu = \overline{x_i \mapsto v_i}, x \mapsto v'}
+\end{tabular}
+\]
+
+As there is no way for a reference to be duplicated, the mapping
+from variable names to store locations is injective and therefore we have
+no need for explicit ``location values'' as in the typical treatment of 
+languages with references (such as in \cite{Pierce2002}). There is no need
+for a separate store typing, as a well-typed store can be defined directly
+in relation to a context as in \figref{fig:storetype}. A well-typed store
+may mappings for variables which are not in the context as shown in
+rule \textsc{st\_extra}.
+
+\begin{figure}
+
+\ottdefnreduce
+
+\caption{\label{fig:opsemantics} Operational semantics}
+\end{figure}
+
+\subsection{Type rules and soundness}
+
+As the language is imperative and the types of variables pointing to objects can
+change, it is necessary for the typing judgements to express changes to the 
+environment. We must then be able
+to prove that the changes in the environment correspond to the changes in the
+store during evaluation. A context $\Gamma$ is a set of unique variable names 
+mapped to types, defined as $\Gamma\:\mathrm{::=}\:\overline{x_i : T_i}$,
+with each $x_i$ distinct. \figref{fig:storetype} defines what it means for
+a store to be well-typed with respect to a
+context. \figref{fig:typerules} defines the rules for well-typed terms
+in the language, while \figref{fig:subtyperules} defines the subtyping
+relation.
+
+\begin{figure}
+\begin{ottdefnblock}
+{$\Gamma  \vdash  \mu$}
+{\ottcom{store $\mu$ is well typed against context $\Gamma$}}
+\end{ottdefnblock}
+
+\[
+\begin{tabular}{cc}
+\infer[\textsc{st\_empty}]
+{\emptyset \vdash \emptyset}
+{}
+&
+\infer[\textsc{st\_vars}]
+{\overline{x_i : T_i} \vdash \overline{x_i \mapsto v_i}}
+{\typerule{\Gamma}{v_i}{T_i}{\Gamma'}}
+\\\\
+\multicolumn{2}{c}{
+\infer[\textsc{st\_extra}]
+{\Gamma \vdash \mu, \overline{y_j \mapsto v_j}}
+{\Gamma \vdash \mu & \overline{y_j \notin dom(\mu)}}
+}
+\end{tabular}
+\]
+
+\caption{\label{fig:storetype} Store typing judgements}
+\end{figure}
+
+\begin{figure}
+\ottdefnmethtype
+
+\ottdefntype
+
+\caption{\label{fig:typerules} Type rules}
+\end{figure}
+
+\begin{figure}
+
+\ottdefnsubtype
+
+\caption{\label{fig:subtyperules} Subtyping rules}
+\end{figure}
+
+Corresponding to the values of the language, there are four main kinds
+in the type system: Unit, Bool, function types and object types. 
+Two modifications are made to the definition of object protocols described
+in \secref{sec:tsmodel}: methods have return types, and an object type
+is the combination of an object protocol and a {\it set} of states.
+An object protocol $O$ is therefore formally defined as the tuple 
+$O = \langle M, \Sigma, \Delta \rangle$
+where the transition relation $\Delta \subseteq \Sigma \times M \times T \times \Sigma$, 
+where $T$ is the set of all types in the language.
+
+While an object value in TS is still deterministic and has a single state at any 
+given
+point in time, we may not be able to determine in the type system which state 
+exactly it is in --- conditional evaluation readily produces this situation.
+With an if-then-else statement where the branches
+interact with an object differently, it is common for the state of the object
+at the end of each branch to be different. As
+knowing precisely which branch will be taken is rarely possible in a
+decidable type system, we must either insist that the state of the object
+be the same upon exit from both branches, or devise a means to cope with
+the object being in one of multiple potential states. We choose the latter
+approach, as it is both more flexible and allows for intuitive principal
+types to be chosen, as will be discussed later.
+
+
+% abandoned attempt to define join/meet
+% \begin{figure}
+
+% \[
+% \begin{array}{c}
+% \infer[\sqcap-state]
+%   {S \sqcup S_2 = \{ \overline{ m : T'' \Rightarrow (S_3 \sqcap S_4)} \} }
+%   {
+%   m : T \Rightarrow S_3 \in O@S
+%   &
+%   m : T' \Rightarrow S_4 \in O_2@S_2
+%   &
+%   T'' = T \sqcup T'
+%   }
+% \\
+% \infer[\sqcup-omg]
+%   {S \sqcup S_2 = 
+%   \{ \overline{ m : T'' \Rightarrow (S_3 \sqcup S_4} \} } 
+%   \cup
+%   \{ \overline{ m' : T_3 \Rightarrow S_4 \} }
+%   {}
+% \]
+
+% \caption{\label{fig:joinmeet} Join/meet definition}
+% \end{figure}
+
+An object type in TS, written $O@\overline{S}$, is equivalent to
+$\bigsqcup_{S \in \overline{S}} O@S$, where $T \sqcup T'$ is the least upper
+bound (or {\it join}) of $T$ and $T'$. Deriving a least upper bound for
+two arbitrary object types (with a single current state) 
+involves constructing the intersection of the state machines for each object 
+type, using the current state of each object type as the initial state.
+Similarly, deriving a greatest lower bound is based upon the union of
+the two state machines in the same fashion. Join is always defined for
+object types, while meet is not --- where the return types of methods are
+incompatible (i.e. no join/meet exists respectively), a join operation will 
+discard the method (it is unsafe to
+call it) while a meet operation would require that the method be callable,
+however no valid return type can be assigned to the method. Therefore
+the kind of object types is a join semi-lattice, with the object type 
+$\{ S_1 \{\} \}@S_1$ serving as the least element. 
+
+The intuition here is that the only sequences of method calls which can be 
+safely invoked on an object of type $O@\overline{S}$ are those which could be 
+safely invoked on each individual $O@S$, where $S \in \overline{S}$, and that
+a least upper bound of the return types exists.
+
+In general, the set of
+types in TS is a disjoint union of join semi-lattices.
+
+\subsection{Extra notational conventions}
+
+Given the formal definition of an object type $O@\overline{S}$, to save
+referring to the $\Sigma$, $M$ and $\Delta$ that $O$ is composed of we shall
+use the following notational conventions:
+
+\begin{itemize}
+\item $S \in O$, a predicate asserting $S$ is a state of $O$, is equivalent to
+$S \in \Sigma$.
+\item $m : T \Rightarrow S' \in O@S$, the method existence predicate, 
+states the method $m$ with return type $T$ exists in state $S$ and triggers a 
+transition to state $S'$ when called. Formally, $(S,m,T,S') \in \Delta$.
+\item $m : T \Rightarrow \overline{S'} \in O@\overline{S}$ is the extension
+of the previous to state sets, meaning that for all $S \in \overline{S}$
+there exists a state $S'$ and type $T'$ where 
+$(S,m,T',S') \in \Delta$ and that
+$T = \bigsqcup_{S \in \overline{S}} \{ T' | (S,m,T',S') \in \Delta \}$ exists
+and that $\overline{S'} = \{ S' | (S,m,T',S') \in \Delta \}$.
+\item $O@\overline{S} \sim O_2@\overline{S_2}$, the extension of the
+simulation relation to support state sets, can be interpreted as
+as $\bigsqcup_{S \in \overline{S}}O@S \sim \bigsqcup_{S_2 \in \overline{S_2}}O_2@S_2$.
+\end{itemize}
+
+\subsection{Effect types}
+
+An ``effect type'' $T \gg T'$ describes how the type of a variable changes
+in response to function application. In the TS language, the only type
+changes that are those which change the state of an object instance; the
+values of the other types are immutable. If a boolean is passed as a parameter,
+the effect type will always be $\boolt \gg \boolt$, similarly for
+$\unitt$ and $\funt{T}{U}{V}$. An effect type of $\boolt \gg \unitt$ is not
+possible. In general, effect types are kind-preserving.
+
+\begin{figure}
+\includegraphics[width=0.49\textwidth]{sm1.pdf}
+\caption{\label{fig:sm1} Operational semantics}
+\end{figure}
+
+In the case of an object parameter, not all effect types are possible
+either. Consider
+the object protocol in \figref{fig:sm1}, which we will refer to as $O_1$.
+An effect type of $O_1@B \gg O_1@A$ is impossible for this protocol, as there
+is no sequence of method calls which would result in a transition from state
+$B$ to state $A$. An effect type of $O_1@B \gg O_1@\{B,D\}$ is possible, 
+as there is at least one sequence of method calls on an object in
+state $B$ to both state $B$ and $D$.
+An effect type $O_1@{B,D} \gg O_1@{B,C}$ which has a state set on
+the left hand side is possible as there exists a sequence of method calls 
+that would take an object in state $B$ to $C$ that would also
+take an object in state $D$ to $B$ (specifically, a single method
+call to $b$).
+
+In the general case, an effect type concerning an object protocol $O$
+of form $O@\overline{S} \gg O@\overline{S_2}$ is
+legal if:
+
+\begin{itemize}
+\item Given a sequence of method calls that takes an object in state $S \in \overline{S}$
+to state $S_2 \in \overline{S_2}$, the same sequence must also take an object
+in any other $S' \in \overline{S}$ to a state $S_2' \in \overline{S_2}$.
+\item All $S_2 \in \overline{S_2}$ are reachable by at least one sequence
+of method calls from an object in a state $S \in \overline{S}$.
+\end{itemize}
+
+Checking the legality of an effect type is straightforward: by computing the
+intersection of all the states, we can associate with each state in the 
+intersection a set of states in the original machine
+it was derived from (as shown in \figref{fig:sm1}. 
+Should an associated state set contain an end state,
+if all other states in the set are also end states then this represents a
+``candidate'' end state within the intersection machine. The union of the state 
+sets associated with all candidate end states must be equal to the
+desired end state set for the effect type to be legal. This would correctly rule 
+out the effect type $O@\{B,D\} \gg O@\{B\}$ (there is no sequence of method
+calls that would take an instance in either state $B$ or $D$ and result in
+the object exclusively being in state $B$) while accepting effect types
+$O@\{B,D\} \gg O@\{B,D\}$ (corresponding to no operations occurring) and
+$O@\{B,D\} \gg O@\{B,C,D\}$ (corresponding to either no operations occuring
+or a single call to $b$).
+
+\subsection{Principal types}
+
+A principal type is one which makes the smallest commitment about 
+the structure of a value based on its usage; due to the presence of subtyping 
+in TS, a principal type is an upper bound on the type of the value.
+
+\begin{figure}
+\includegraphics[width=0.49\textwidth]{principal.pdf}
+\caption{\label{fig:principalex}}
+\end{figure}
+
+Following from this general definition, a principal object type in TS 
+is an object protocol and initial state set which permits all sequences of 
+method calls that could be generated by an associated term $t$, and no more. 
+In other words,
+the language accepted by the state machine is the smallest possible, while
+the return types of methods are as general as possible. Consider the example
+function $f$ shown in \figref{lst:principalex}. It is clear from the usage
+of $y$ that it must be of type $\boolt$ as demanded by the type judgement
+of an if-then-else statement, while $x$ is an object of some sort.
+We could ascribe any of the object types $O_1@A$, $O_2@A$ and $O_3@A$ to the parameter 
+$x$, and after evaluation the object types would be $O_1@A$, $O_2@\{E,H\}$
+and $O_2@F$ respectively.
+$O_1@A$ is not principal as it will admit many more sequences of method calls 
+than strictly required by the body of function $f$, while $O_2@A$ and $O_3@A$ 
+are principal.
+
+$O_2$ contains more states than are strictly necessary, i.e. it
+is not a {\tt minimal} state machine, while $O_3$ is minimal.
+We do not require that a principal type be minimal. If necessary, any
+principal state machine we produce can be minimised, so this can be done
+on demand where there is a specific need for it. One such need may be when
+presenting the type to a user, as a minimal state machine may be easier to 
+understand. Regardless, the state machines $O_2$ and $O_3$ can be shown to be 
+isomorphic in the language that they accept (starting at state $A$), and that 
+language is minimal, so we assert that either are acceptable principal types.
+
+Similarly, it is possible for a principal effect type to have more than
+one state in the state set of the input (left) object type. It is
+always possible to restructure such an object type to have a single initial
+state. It is not, however, possible to have both a single input state and
+single output state for a state machine accepting an arbitrary language --- 
+consider the language accepted by the regular expression $m^* | n^*$. It is 
+necessary for a state machine which accepts this language, and only this 
+language, to
+have at least three exit states. In general, it is more intuitive to have
+a single input state in the effect type but this is not required for a
+type to be considered principal.
+
+A principal type we can therefore ascribe to the function $f$
+is $\forall T_1 \ldots T_6 . (O_3@A \gg O_3@F, \boolt) \rightarrow T_6$, 
+or equivalently 
+$\forall T_1 \ldots T_6 . (O_2@A \gg O_2@\{E,H\}, \boolt) \rightarrow T_6$.
+
+There are occasional advantages to not always minimising principal state
+machines. The additional structure of $O_2$ retains additional information
+in the effect type which can be helpful when interpreting an effect type
+when a subtype is passed to the function, as will be described in the next
+section.
+
+\subsection{Interpreting effect types}
+
+The typing judgement for a function call permits a passed parameter to
+be a subtype of the input portion of the associated effect type.
+Determining a precise upper bound for the type of the parameter after the
+function call, in particular where the parameter is an object, 
+requires some thought.
+
+Consider a function call $f(x)$ where
+$f : (O_2@\overline{S_2} \gg O@\overline{S_4}) \rightarrow T$ and
+$x : O_1@\overline{S} <: O_2@\overline{S_2}$, where $O_1$ and $O_2$
+are the state machines from \figref{fig:principalex}, 
+$\overline{S} = \{ A \}$, $S_2 = \{ A \}$ and $S_4 = \{E, H\}$. 
+Based on the effect type,
+we can assert that the function will have interacted with the $x$ using
+one of the possible sequences that would be accepted by $O_2@\overline{S_2}$,
+ending with the object in the state set $\overline{S_4}$. 
+
+A straightforward but questionable choice would 
+be to replace the type of the variable
+with that of the output portion of the effect type after the call. However,
+this will often result in an unacceptable loss of type information,
+reducing the number of valid programs which can be typed within the system.
+
+It is clear that as $\ot{O}{S} \sim \ot{O_2}{S_2}$ there must exist some
+$\overline{S_3}$ such that $\ot{O}{S_3} \sim \ot{O_2}{S_4}$.
+One possible solution would be to choose
+$\overline{S_3} = \{ S | O@S \sim \ot{O_2}{S_4} \}$. This is not specific
+enough however --- given the object protocols from \figref{fig:principalex},
+$\overline{S_3} = \{ A, B, C, D \}$ as there are no possible method calls
+on states $E$ or $H$ of $O_2$.
+
+It is clear that our choice of $S_3$ must relate the set of possible method
+call sequences between $\ot{O_2}{S_2}$ and $\ot{O_2}{S_4}$. For this we
+define a relation between pairs of object types
+$(O@\overline{S}, O_2@\overline{S_2} \lesssim 
+(O@\overline{S'}, O_2@\overline{S_2'})$, which we call the
+{\it simulation predecessor relation}. The definition of this relation
+is given in \figref{fig:simreach}. Essentially, if $O@S \sim O_2@S_2$ and there
+exists a sequence of method calls that would transition an object value of type
+$O_2@\overline{S_2}$ to $O_2@\overline{S_4}$, then this sequence of method calls
+would transition an object in state $O@\overline{S}$ to $O@\overline{S_3}$
+such that $O@\overline{S_3} \sim O@\overline{S_4}$. This is abbreviated to
+$(O@\overline{S}, O_2@\overline{S_2}) \lesssim (O@\overline{S_3}, O@\overline{S_4})$.
+
+Using this relation, we can choose $\overline{S_3} = 
+\bigcup \{ \overline{S'} | 
+  (\ot{O}{S} , \ot{O_2}{S_2}) \lesssim (\ot{O}{S'}, \ot{O_2}{S_4})
+\}$. The solution using the object protocols from \figref{fig:principalex}
+will therefore be $\overline{S_3} = \{ A \}$.
+
+\begin{figure}
+
+\[
+\begin{array}{c}
+\\
+\infer[\lesssim\textsc{-adj}]
+  {(O@\overline{S}, O_2@\overline{S_2}) \lesssim (O@\overline{S_3}, O_2@\overline{S_4})}
+  {
+    \begin{array}{cc}
+    O@\overline{S} \sim O_2@\overline{S_2}
+    \\
+    m : T_i \Rightarrow \overline{S_4} \in O@\overline{S_2}
+    \\
+    m : T_i' \Rightarrow \overline{S_3} \in O@\overline{S}
+    \end{array}
+  }
+\\\\
+\infer[\lesssim\textsc{-refl}]
+  {(O@\overline{S}, O_2@\overline{S_2}) \lesssim (O@\overline{S}, O_2@\overline{S_2})}
+  {O@\overline{S} \sim O_2@\overline{S_2}}
+\\\\
+\infer[\lesssim\textsc{-trans}]
+  {
+  (O@\overline{S}, O_2@\overline{S_2}) \lesssim (O@\overline{S_5}, O_2@\overline{S_6})
+  }
+  {
+  \begin{array}{c}
+  (O@\overline{S}, O_2@\overline{S_2}) \lesssim (O@\overline{S_3}, O_2@\overline{S_4})
+  \\
+  (O@\overline{S_3}, O_2@\overline{S_4}) \lesssim (O@\overline{S_5}, O_2@\overline{S_6})
+  \end{array}
+  }
+\end{array}
+\]
+\caption{\label{fig:simreach} Definition of the simulation predecessor relation}
+\end{figure}
+
+The type system of TS uses a partial function named {\it remap}, defined in
+\figref{fig:remaprules} to formalise
+this selection of the type of a parameter after a function call. The cases
+for Bool, Unit and function types are trivial as these types are immutable,
+while for objects the simulation predecessor relation is used.
+
+\begin{figure}
+\ottdefnremap
+
+\caption{\label{fig:remaprules} Definition of remap}
+\end{figure}
+
+\subsection{Soundness}
+
+The soundness of the type system is stated formally in the following
+theorem:
+
+\begin{thm}[Progress and Preservation]
+Given a term $t$ such that $\typerule{\Gamma}{t}{T}{\Gamma'}$
+with a store $\mu$ such that $\Gamma \vdash \mu$, either $t$ is a value or 
+there exist $t'$ and $\mu'$ such that
+$\oprule{t}{\mu}{t'}{\mu'}$, with some $\Gamma''$ such that
+$\Gamma'' \vdash \mu'$ and $\typerule{\Gamma''}{t'}{T}{\Gamma'}$.
+\end{thm}
+
+\begin{proof}
+in appendix \appref{app:soundness}.
+\end{proof}
+
+\section{Type inference for TS0}
+
+Throughout much of the preceding text we have avoided writing object
+types using the full syntax, instead preferring to use diagrams. The full
+syntax for object types is verbose and difficult for a user to parse.
+Having to write out object types in full would therefore obfuscate the
+intent of the code, particularly when there is such intuitively a
+strong correlation between the code and the principal object types of the
+variables it interacts with. As such, the ability to infer principal object
+types is essential for any language which includes typestate, especially
+where structural rather than nominal subtyping is employed.
+
+The main source of type verbosity in TS0 is the requirement for
+type annotations on function literals. 
+Despite there being no need for alias control
+annotations, the effect declarations for each parameter are still verbose
+and the ability to define type aliases would only help partially.
+
+We therefore desire a general type inference strategy that can infer a
+minimal $\Gamma$, $\Gamma'$ and $\alpha$ for a term $t$ such that 
+$\typerule{\Gamma}{t}{\alpha}{\Gamma'}$. If $t$ is the body of a function
+literal, we can extract the effect types for the named parameters (of which
+the free variables of $t$ should be a subset) from $\Gamma$ and $\Gamma'$.
+
+Our approach to type inference is inspired by \cite{Pottier2005} which advocates
+separate constraint generation and constraint solving phases for
+type inference. Our constraint grammar is shown in \figref{fig:congrammar}.
+
+\begin{figure}
+\ottgrammartabular{
+\ottC\ottinterrule
+\ottctxc\ottinterrule
+\otttyc\ottinterrule
+\otttinf\ottinterrule
+}
+\caption{\label{fig:congrammar} Constraint grammar}
+\end{figure}
+
+\begin{figure}
+\[
+\begin{array}{l}
+
+% unit value
+\inferlhs{\unitv} \triangleq \alpha = \unitt \cand \gamma = \gamma' 
+\\\\
+
+% true value
+\inferlhs{\truev} \triangleq \alpha = \boolt \cand \gamma = \gamma' 
+\\\\
+
+% false value
+\inferlhs{\falsev} \triangleq \alpha = \boolt \cand \gamma = \gamma' 
+\\\\
+
+% object value
+\inferlhs{[ \overline{S_i \{ \overline{ m_{ij} = (v_{ij}, S_{ij}) } \} }]@S}
+\triangleq
+\exists \overline{\alpha_{ij}} . \\
+\alpha = \{ \overline{ S_i \{ \overline{ m_{ij} : \alpha_{ij} >> S_{ij} } \} }\}@S
+\cand
+\gamma = \gamma'
+\cand \\
+\overline{\inferrule{\gamma}{\triangleright v_{ij}}{\alpha_{ij}}{\gamma}}
+\\\\
+
+% function value
+\inferlhs{\lambda ( \overline{x_i} ) . t} \triangleq
+\exists \gamma_r, \gamma_{in}, \gamma_{out}, \overline{\alpha_{ai}, \alpha_{bi}}, \alpha_r . \\
+\alpha = (\overline{\alpha_{ai} \gg \alpha_{bi}}) \rightarrow \alpha_r
+\cand
+\gamma = \gamma'
+\cand
+\gamma_r = \emptyset
+\cand \\
+\gamma_{in} = \gamma_r, \overline{x_i : \alpha_{ai}}
+\cand
+\overline{x_i : \alpha_{bi} \in \gamma_{out}}
+\cand
+\\
+\inferrule{\gamma_{in}}{t}{\alpha_r}{\gamma_{out}}
+\\\\
+
+% let binding
+\inferlhs{\lett{x}{t'}{t}} \triangleq \exists \gamma_v, \gamma_{b1}, \gamma_{b2}, \alpha' . \\
+\gamma_{b1} = \gamma_v, x : \alpha'
+\cand
+\gamma' = \gamma_{b2} - \{ x \}
+\cand \\
+\inferrule{\gamma}{t'}{\alpha'}{\gamma_v}
+\cand
+\inferrule{\gamma_{b1}}{t}{\alpha}{\gamma_{b2}}
+\\\\
+
+% sequence
+\inferlhs{t ; t'} \triangleq
+\exists \gamma'', \alpha' . \\
+\inferrule{\gamma}{t}{\alpha'}{\gamma''}
+\cand
+\inferrule{\gamma''}{t'}{\alpha}{\gamma'}
+\\\\
+
+% function call
+\inferlhs{x ( \overline{x_i} )} \triangleq
+\exists \overline{\alpha_i}, \overline{\alpha_i'}, \overline{\alpha_i''} . \\
+\overline{x_i : \alpha_i \in \gamma}
+\cand 
+x : ( \overline{\alpha_i' \gg \alpha_i''} ) \rightarrow \alpha \in \gamma
+\cand
+\\
+\gamma' = \gamma [ \overline{x_i \mapsto \remapapp{\alpha_i}{\alpha_i'}{\alpha_i''} } ]
+\\\\
+
+% method call
+\inferlhs{x.m} \triangleq
+\exists \alpha_x . \\
+x : \alpha_x \in \gamma
+\cand 
+\cand  \\
+\gamma' = \gamma[ x \mapsto \remapapp{\alpha_x}{O@S}{O@S'} ]
+\\
+\mathrm{where } O = \{ S \{ m : \alpha \Rightarrow S' \} S' \{ \} \}
+\\\\
+
+% if-then-else
+\inferlhs{\ift{t_c}{t_t}{t_f}} \triangleq
+\\
+\exists \alpha_c, \alpha_t, \alpha_f, \gamma_c, \gamma_t, \gamma_f . \\
+\inferrule{\gamma}{t_c}{\alpha_c}{\gamma_c}
+\cand
+\inferrule{\gamma_c}{t_t}{\alpha_t}{\gamma_t}
+\cand 
+\\
+\inferrule{\gamma_c}{t_f}{\alpha_f}{\gamma_f}
+\cand
+\alpha_c = \boolt
+\cand
+\\
+\alpha = \alpha_t \sqcup \alpha_f
+\cand
+\gamma' = \gamma_t \sqcup \gamma_f
+\\\\
+
+\end{array}
+\]
+\caption{\label{fig:constraintgen} Constraint generation}
+\end{figure}
+
+There are three categories of constraints:
+
+\begin{itemize}
+\item {\bf Context constraints} --- these define relationships between contexts.
+It is important that type changes be correctly observed by the inference
+approach and that context constraints expressed in terms of equality, extension,
+modification and removal exactly mirror the typing judgements. 
+Extension, replacement and removal constraints modify the solution of
+another context variable. Following these context variable dependencies,
+ultimately every context variable depends upon a {\it root} variable which
+is either of form $\gamma = \emptyset$ or $\free{\gamma}$. The root
+context is {\it free} when it is the input context to the top-level term being
+processed, while
+the root is {\it empty} when it is the input context for a function body term.
+A free context can be arbitrarily extended with new variables, while an
+empty context cannot --- this difference allows the detection of unbound
+variable usage within function bodies and the collection of free variables
+in the root term.
+
+Additionally, we have {\bf variable usage constraints} of form 
+$x : \mathbb{T} \in \gamma$, which are generated for each location in the
+program where a variable is used and what type that usage implies. These
+are used to generate additional type variable
+constraints by matching the asserted type $\mathbb{T}$ with what is known
+about the type of $x$ in $\gamma$.
+
+\item {\bf Type expressions constraints} --- these express 
+constraints between two or three types: either two types are equal,
+or one type is the join of two others. The latter form of type constraint
+is generated when dealing with if-then-else terms.
+\end{itemize}
+
+Type variables can appear at any position within a type's structure, as shown
+in the grammar for $\mathbb{T}$. Objects are treated as a special case, where
+we use variables as placeholders for the object definition and state parts.
+The states and transitions of the object structure are determined at a later
+stage in the type inference process.
+
+A constraint generation expression $\inferlhs{t}$, which relates the term
+to an input context variable, a type variable and an output context variable, 
+is expanded using the rules shown in \figref{fig:constraintgen}.
+The constraint generation process for a root term $t$ begins with
+$\exists \gamma, \gamma', \alpha. \free{\gamma} \cand \inferlhs{t}$.
+
+The constraint generation rules correspond to the typing judgements for 
+well-typed terms as one would expect:
+
+\begin{itemize}
+\item All value terms produce a $\gamma = \gamma'$ constraint as values do
+not change the context. Additionally, a type variable constraint of form
+$\alpha = \mathbb{T}$ where $\mathbb{T}$ is of the appropriate type to match
+the value, with type variables in all positions relating to parameters and return
+values.
+\item The context variable $\gamma_a$ used as the input context for
+function bodies has an empty root $\gamma_r$, to allow for detection of 
+used unbound variables within
+the body. This matches the use of a context in type inference
+composed only of the parameters, and prevents implicit binding.
+\item Let-bind terms generates a new context variable $\gamma_v$ for the
+output context of the value term. This is extended by $\gamma_{b1}$, the
+input context for the body term, with variable $x$ of the type inferred
+for the value. The output context of the whole let-bind term removes
+$x$ from the output context $\gamma_{b2}$ of the body term.
+\item Update terms generate replacement constraints based on the inferred
+type $\alpha'$ of the right-hand side of the expression.
+\item Sequencing terms relate the output of the left term to the input of the
+right term through a new context variable $\gamma''$. The type variable
+$\alpha'$ must be generated to capture the type of the left term for
+consistency, but it is not needed.
+\item Function call terms generate context variable constraints to relate the
+usage of the variables to whatever information has been inferred about the
+parameter types of the function. All variables $\overline{x_i}$ used as 
+parameters in the function call are replaced in the output context with
+new type bindings to $\overline{\alpha_i'}$, which represents the effect
+of the function.
+\item Method call terms generate type variables to capture that $x$ must
+be an object, that the method $m$ must exist in the current state $\alpha_s$
+and that after the method call $x$ must be in the new state $\alpha_s'$.
+\end{itemize}
+
+\subsection{Context constraint solving}
+
+Constraint solving is performed in phases. In the first phase, the context 
+constraints
+are normalised using the rules in \figref{fig:contextsolve} --- where the set of 
+constraints in the premise exists, they are replaced with those in the 
+conclusion. Normalisation means that every context variable will have a single 
+defining constraint of form $\gamma = \emptyset$, $\free{\gamma}$ or
+$\gamma = \gamma', \overline{x_i : \mathbb{T}_i}$, where $\gamma'$ is
+either empty or free. A context $\Gamma$ for type checking can be easily
+constructed from constraints in this form, as once the type variable
+constraints are solved we can say $\Gamma = \overline{x_i : T_i}$ for
+every $\gamma = \gamma', \overline{x_i : \mathbb{T}_i}$ where $T_i$ is the
+solved form of $\mathbb{T}_i$.
+
+The context normalisation rules do the following:
+
+\begin{itemize}
+\item \textsc{ceq} --- Where $\gamma$ is directly equivalent
+to $\gamma'$, which is defined in terms of extension of
+$\gamma''$, rewrite the constraints such that
+$\gamma$ directly copies the extension of $\gamma''$.
+\item \textsc{crem} --- Where $\gamma$ removes a variable $x$ from $\gamma'$,
+which is defined in terms of extension of $\gamma''$, rewrite the
+constraints such that $\gamma$ copies the extension of $\gamma''$ with
+the variable $x$ removed from the extension. There is no need for an
+error-producing variant of \textsc{crem}, where the variable $x$ is missing, 
+as context removal constraints are always generated in a pair with a context 
+extension constraint for let binding.
+\item \textsc{cext} --- Where $\gamma$ extends $\gamma'$ with
+a variable set $\overline{y_j}$, and $\gamma'$ is defined in terms of extension of
+$\gamma''$ with a disjoint set of variables in its extension set, rewrite the
+constraints such that $\gamma$'s extension set includes both the $y_j$
+definitions and $x_j$ definitions.
+\item $\textsc{cext}_2$ --- Where $\gamma$ extends $\gamma'$ with
+a new variable $x$, and $\gamma'$ is defined in terms of extension of
+some $\gamma''$ and the extension set already contains $x$, this
+represents an attempt to redeclare $x$. As such, generate an error
+$\mathbf{bound}\:x$, terminating the constraint solving process.
+\item \textsc{crep} --- where $\gamma$ replaces the type of some
+variable $x$ in $\gamma'$, where $\gamma$ is defined in terms of extension
+of $\gamma''$ and $x$ is in the extension set, rewrite the constraints
+such that $\gamma$ copies the extension set of $\gamma'$ with $x$
+replaced as specified.
+\item $\textsc{crep}_2$ --- where $\gamma$ replaces variable $x$ in
+$\gamma'$ which is defined in terms of extension of $\gamma''$
+which is free and $x$ is not in the extension set, $x$ is a
+free variable in the term being processed. To introduce $x$ in such a way that
+it will be included in all contexts, $\gamma''$ is redefined in
+terms of extension of a new context $\gamma_r$ with variable $x$
+in the extension set mapped to a new type variable $\alpha$. Following
+this, \textsc{cext} can be applied to $\gamma'$, then \textsc{crep} can
+be applied to $\gamma$.
+\item $\textsc{crep}_3$ --- where $\gamma$ replaces variable $x$ in
+$\gamma'$ which is defined in terms of an empty root $\gamma''$,
+and $x$ is not in $\gamma$'s extension set, this indicates the usage
+of an unbound variable within a function body. As such, generate an
+error $\mathbf{unbound}\:x$ indicating that x is unbound within this
+context, terminating the contraint solving process.
+\item \textsc{cvar} --- where a variable constraint for $x$ exists
+for context variable $\gamma$, which is defined in terms of
+extension of $\gamma_r$ which is free, and $x$ is not in the extension
+set of $\gamma$, $x$ is a free variable in the term being processed. 
+Similar to $\textsc{crep}_2$, redefine $\gamma_r$
+in terms of extension of a new root $\gamma_r'$, with $x$ in
+the extension set with the observed type $\mathbb{T}$.
+\item $\textsc{cvar}_2$ --- where a variable constraint for $x$ exists
+for context variable $\gamma$, which is defined in terms of $\gamma'$
+which is empty, and $x$ is not in the extension set of $\gamma$, 
+$x$ is an unbound variable within a function body.
+\end{itemize}
+
+The rules are repeatedly applied to any matching sets of constraints
+until no further rewriting is possible, producing either an error
+or a set of context constraints which are fully normalised, and
+can be converted into contexts for type checking easily.
+
+The way in which the context constraints are generated guarantees
+that the dependencies between contexts form a directed acyclic graph. For
+this reason, we believe that that the first phase will always terminate,
+but this has not yet been proven.
+
+\subsection{Variable usage \& type variable constraint solving}
+
+In the second phase, additional type variable 
+constraints are generated by following the rule in \figref{fig:tvargen}, which
+compares the observed type from the usage of a variable to the type
+known in the context. Repeated application of this rule until no more matches
+are found produces a constraint set composed exclusively of normalised
+context variable constraints, type variable constraints and protocol
+constraints. A first order unification algorithm can then be used to solve
+the system of type variable constraints, producing a most general unifier
+for the type variables if unification is possible.
+
+First order unification will identify a set of type variables (and their synonyms)
+which represent distinct object types. For each distinct object type, there
+will also be a set of type variables which represent distinct states for
+the object type. By matching these variables to the protocol constraints
+within the constraint set, we can generate the state machine for each
+object type in a straightforward manner. To produce a minimal description of 
+the object protocol, this state machine can be minimised by constructing a 
+bisimulation relation between the states within each object and collapsing 
+equivalent states.
+
+The typing rules of TS0 do not permit polymorphism, so
+if the most general unifier does not map all type variables for
+variables that occur in the input and output contexts of the term being
+processed, then the term has no valid type in the language. Otherwise,
+substituting the fully explicit type inferred for each type variable that
+occurs in the inferred input and output context variables, as well as the
+type variable for the input term, should produce a valid typing judgement
+where the domain of the input context is the set of free variables in
+the term. This has not yet been proven.
+
+\begin{figure}
+
+\begin{center}
+\begin{tabular}{c}
+	\infer[\textsc{ceq}]
+	{\gamma = \gamma'', \overline{x_i : \mathbb{T}_i} \cand \gamma' = \gamma'', \overline{x_i : \mathbb{T}_i}}
+	{\gamma = \gamma' \cand \gamma' = \gamma'', \overline{x_i : \mathbb{T}_i}}
+\\\\
+	\infer[\textsc{crem}]
+	{
+	\gamma = \gamma'', \overline{x_i : \mathbb{T}_i} \cand \gamma' = \gamma'', \overline{x_i : \mathbb{T}_i}, x : \mathbb{T}
+	}
+	{
+	\gamma = \gamma' - \{x\} \cand \gamma' = \gamma'', \overline{x_i : \mathbb{T}_i}, x : \mathbb{T}
+	}
+\\\\
+	\infer[\textsc{cext}]
+	{\gamma = \gamma'', \overline{x_i : \mathbb{T}_i}, \overline{y_j : \mathbb{T}_j} \cand \gamma' = \gamma'', \overline{x_i : \mathbb{T}_i}}
+	{
+		\gamma = \gamma', \overline{y_j : \mathbb{T}_j} \cand \gamma' = \gamma'', \overline{x_i : \mathbb{T}_i}
+		& \overline{y_j} \cap \overline{x_i} = \emptyset
+	}
+\\\\
+	\infer[\textsc{cext\_2}]
+	{\mathbf{bound}\:x}
+	{
+		\gamma = \gamma', \overline{y_j : \mathbb{T}_j}, x : \mathbb{T} \cand \gamma' = \gamma'', \overline{x_i : \mathbb{T}_i}
+		& x \in \overline{x_i}
+	}
+\\\\
+	\infer[\textsc{crep}]
+	{\gamma = \gamma'', \overline{x_i : \mathbb{T}_i}, x : \mathbb{T} \cand
+	\gamma' = \gamma'', \overline{x_i : \mathbb{T}_i}, x : \mathbb{T}'}
+	{\gamma = \gamma'[x \mapsto \mathbb{T}] \cand
+	\gamma' = \gamma'', \overline{x_i : \mathbb{T}_i}, x : \mathbb{T}'}
+\\\\
+	\infer[\textsc{crep\_2}]
+	{
+	\begin{array}{c}
+	\exists \alpha, \gamma_r . 
+	\gamma = \gamma'[x \mapsto \mathbb{T}] \cand
+	\gamma' = \gamma'', \overline{x_i : \mathbb{T}_i} \cand
+	\\
+	\gamma'' = \gamma_r, x : \alpha \cand
+	\free{\gamma_r}
+	\end{array}
+	}
+	{
+	\begin{array}{c}
+	\begin{array}{ccc}
+	x \notin \overline{x_i}
+	&
+	\fresh{\gamma_r}
+	&
+	\fresh{\alpha}
+	\end{array}
+	\\
+	\gamma = \gamma'[x \mapsto \mathbb{T}] \cand
+	\gamma' = \gamma'', \overline{x_i : \mathbb{T}_i} \cand
+	\free{\gamma''}
+	\end{array}
+	}
+\\\\
+	\infer[\textsc{crep\_3}]
+	{\mathbf{unbound}\:x}
+	{
+	\begin{array}{c}
+	x \notin \overline{x_i}
+	\\
+	\gamma = \gamma'[x \mapsto \mathbb{T}] \cand
+	\gamma' = \gamma'', \overline{x_i : \mathbb{T}_i} \cand
+	\gamma'' = \emptyset
+	\end{array}
+	}
+\\\\
+	\infer[\textsc{cvar}]
+	{\exists \gamma_r' . 
+	\gamma = \gamma_r, \overline{x_i : \mathbb{T}_i} \cand
+	\gamma_r = \gamma_r', x : \mathbb{T} \cand
+	\free{\gamma_r'}
+	}
+	{
+	\begin{array}{c}
+	\begin{array}{cc}
+	x \notin \overline{x_i}
+	&
+	\fresh{\gamma_r'}
+	\end{array}
+	\\
+	\gamma = \gamma_r, \overline{x_i : \mathbb{T}_i} \cand 
+	x : \mathbb{T} \in \gamma \cand
+	\free{\gamma_r}
+	\end{array}
+	}
+\\\\
+	\infer[\textsc{cvar\_2}]
+	{\mathbf{unbound}\:x}
+	{x : \mathbb{T} \in \gamma \cand \gamma = \gamma', \overline{x_i : \mathbb{T}_i} \cand \gamma' = \emptyset
+	&
+	x \notin \overline{x_i}}
+\end{tabular}
+\end{center}
+\caption{\label{fig:contextsolve} Context normalisation}
+\end{figure}
+
+\begin{figure}
+\[
+	\infer[\textsc{tvar}]
+	{\mathbb{T} = \mathbb{T}' \cand \gamma = \gamma', \overline{x_i : \mathbb{T}_i}, x : \mathbb{T}'}
+	{x : \mathbb{T} \in \gamma \cand \gamma = \gamma', \overline{x_i : \mathbb{T}_i}, x : \mathbb{T}'}
+\]
+\caption{\label{fig:tvargen} Refining type variable constraints}
+\end{figure}
+
+\subsection{Implementation}
+
+A Scala implementation of a type checker for TS0 which uses the type inference
+technique described can be found at \url{http://github.com/iainmcgin/ts0-lang}.
+A topological order is built from the dependency graph between context variables
+to efficiently normalise the context constraints. The first order unification 
+algorithm presented in \cite{Martelli1982} is used to solve the type variable 
+constraints, allowing the effects for the parameters to be extracted from
+the context variables.
+
+\section{Conclusion}
+
+TS0 is a small, simple language that has proven useful
+for the study of the inference of object protocols, and the theoretical work
+done to date holds promise for future expansion and interesting results. 
+To our knowledge, this is also the first attempt to study the inference
+of generalised typestate in an object oriented context, rather than
+more specific inference problems such as session type inference
+\cite{Collingbourne2010}. The
+constraint generation approach closely aligns with the typing judgements,
+which we believe makes the approach intuitive.
+
+\appendix
+
+\section{Soundness}
+
+\begin{thm}[Progress and Preservation]
+Given a term $t$ such that $\typerule{\Gamma}{t}{T}{\Gamma'}$
+with a store $\mu$ such that $\Gamma \vdash \mu$, either $t$ is a value or 
+there exist $t'$ and $\mu'$ such that
+$\oprule{t}{\mu}{t'}{\mu'}$, with some $\Gamma''$ such that
+$\Gamma'' \vdash \mu'$ and $\typerule{\Gamma''}{t'}{T}{\Gamma'}$.
+\end{thm}
+
+\begin{proof}
+by induction on the structure of $t$. Assume $t$ is not a value. It is
+therefore of one of the following forms:
+
+\begin{itemize}
+\item $t = \lett{x}{t''}{t'}$. 
+It follows by rule \tlet that there exist $\Gamma_1, T', T''$
+such that
+$\typerule{\Gamma}{t''}{T'}{\Gamma_1}$ and that
+$\typerule{\Gamma_1, x : T'}{t'}{T}{\Gamma', x : T''}$. There are two
+possibilities:
+
+  \begin{itemize}
+  \item If $t''$ is some value $v$, then by \lemref{lem:valuectx} 
+  we have that $\Gamma = \Gamma_1$ and reduction can occur
+  by \rletv, such that 
+  $\oprule{\lett{x}{v}{t'}}{\mu}{t'}{\mu [ x \mapsto v ]}$.
+  Let $\mu' = \mu [ x \mapsto v ]$. Let $\Gamma'' = \Gamma, x : T'$.
+  It follows that that $\Gamma'' \vdash \mu'$, with
+  $\typerule{\Gamma''}{t'}{T}{\Gamma', x : T'}$.
+  The requirements of rule \tdrop are satisfied by this, therefore we can 
+  type $t'$ such that $\typerule{\Gamma''}{t'}{T}{\Gamma'}$.
+
+  \item If $t''$ is a term, 
+  by induction we have that $\oprule{t''}{\mu}{t'''}{\mu'}$, with
+  some $\Gamma'' \vdash \mu'$ and $\typerule{\Gamma''}{t'''}{T'}{\Gamma_1}$.
+  This satisfies the requirements of \rlett, meaning $t$ itself can reduce
+  such that $\oprule{\lett{x}{t''}{t'}}{\mu}{\lett{x}{t'''}{t'}}{\mu'}$.
+  Additionally, the conditions of \tlet are satisfied such that
+  $\typerule{\Gamma''}{\lett{x}{t'''}{t'}}{T}{\Gamma'}$.
+
+  \end{itemize}
+
+\item $t = t_l ; t_r$. It follows by rule
+\tseq that $\typerule{\Gamma}{t_l}{T_l}{\Gamma_{mid}}$ and
+$\typerule{\Gamma_{mid}}{t_r}{T}{\Gamma'}$.
+
+  \begin{itemize}
+  \item If $t_l$ is some value $v$, then
+  reduction can occur by \\ 
+  \rseqlv such that
+  $t_l; t_r \mid \mu \longrightarrow t_r \mu$. By \lemref{lem:valuectx}, 
+  $\Gamma'' = \Gamma = \Gamma_{mid}$
+  and $\mu' = \mu$, therefore $\Gamma'' \vdash \mu'$ and 
+  $\typerule{\Gamma''}{t_r}{T}{\Gamma'}$.
+
+  \item If $t_l$ is a term, by induction $t_l \mid \mu \longrightarrow t_l' \mid \mu'$
+  with some $\Gamma'' \vdash \mu'$ and
+  $\typerule{\Gamma''}{t_l'}{T_l}{\Gamma_{mid}}$.
+  This satisfies the requirements of \rseqlt
+  such that $t_l; t_r \mid \mu \longrightarrow t_l'; t_r \mid \mu'$.
+  Additionally, the requirements of \tseq are satisfied such that
+  $\typerule{\Gamma''}{t_l'; t_r}{T}{\Gamma'}$.
+
+  \end{itemize}
+
+\item $t = x ( \overline{x_i} )$. It follows by rule \tfunc that
+$\Gamma = \Gamma_1, \overline{x_i : T_i}$ 
+with $\Gamma_1(x) = \funt{U_i}{V_i}{T}$
+such that $\overline{T_i <: U_i}$ 
+and that $\Gamma' = \Gamma_1, \overline{x_i : T_i'}$
+where $T_i' = \mathbf{remap} ( T_i, U_i >> V_i )$.
+
+As $\Gamma \vdash \mu$, 
+it follows that $\mu(x) = \funv{y_i}{U_i'}{V_i'}{t'}$
+where $\typerule{\overline{y_i : U_i'}}{t'}{T'}{\overline{y_i : V_i'}}$,
+with $\funt{U_i'}{V_i'}{T'} <: \funt{U_i}{V_i}{T}$. It
+follows by \subfn that for each $i$, $U_i <: U_i'$, $V_i' <: V_i$
+and $T' <: T$.
+Additionally for each $x_i$, $\mu(x_i) = v_i$ such that 
+$\typerule{\emptyset}{v_i}{T_i''}{\emptyset}$ 
+where $T_i'' <: T_i$.
+
+Let $t_{sub} = \subst{x_i}{y_i}{t'}$.
+The term $t$ can be reduced by \rfunc such that
+$x ( \overline{x_i} ) \mid \mu \longrightarrow t_{sub} \mid \mu$.
+By the substitution lemma, 
+$\typerule{\overline{x_i : U_i'}}{t_{sub}}{T'}{\overline{x_i : V_i'}}$.
+By lemma \lemref{lem:upgrading}, it follows that
+for each $i$, there exists a $V_i'' = \remapapp{T_i''}{U_i'}{V_i'}$
+such that 
+$\typerule{\overline{x_i : U_i}}{T_{sub}}{T'}{\overline{x_i : V_i''}}$.
+By \lemref{lem:remap} for each $i$ that $V_i'' <: V_i'$.
+
+Therefore, by given that $T_i <: U_i$ and that $V_i'' <: V_i' <: V_i$
+and that $T' <: T$ we can apply \tnarrow, \twiden and \tsub
+such that $\typerule{\overline{x_i : T_i}}{t'}{T}{\overline{x_i : V_i}}$.
+
+Let $\mu' = \mu$. Let $\Gamma'' = \Gamma$. It follows that 
+$\Gamma'' \vdash \mu'$. By applying the weakening lemma, we can type 
+$t_{sub}$ such that $\typerule{\Gamma''}{t''}{T}{\Gamma'}$.
+
+\item $t = x.m$. It follows by rule \tmethc that
+$\Gamma = \Gamma_1, x : O@\overline{S}$ and that 
+$\Gamma' = \Gamma_1, x : O@\overline{S'}$, with
+$\overline{S'} = \{ S_n | m : T_r \Rightarrow S_n \in O@S, S \in \overline{S} \}$.
+As
+$\Gamma \vdash \mu$, we must have $\mu = \mu_1, x \mapsto o'@S_c$ with
+$\Gamma_1 \vdash \mu_1$ and where
+$\typerule{\emptyset}{o'@S_c}{O'@S_c}{\emptyset}$ such that
+$O'@S_c <: O@\overline{S}$. 
+
+By the definition of subtyping for object types,
+we must have that
+$o' = [ S' \{ m = (v,S_n) ; ... \} ... ]$, where $O'@S_n <: O@\overline{S'}$. 
+Where the value $v$ is concerned, $\typerule{\emptyset}{v}{T'}{\emptyset}$
+for some $T'$ such that $T' <: T = \bigsqcup{ \{ T_r | m : T_r \Rightarrow S_n \in O@S, S \in \overline{S} \} }$.
+
+Therefore reduction can occur by \rmethc such that
+$x.m \mid \mu_1, x \mapsto o@S \longrightarrow v \mid \mu_1, x \mapsto o@S_n$.
+Let $\mu' = \mu_1, x \mapsto o@S'$. Let $\Gamma'' = \Gamma'$. It follows that
+$\Gamma'' \vdash \mu'$, as $O'@S_n <: O@\overline{S'}$. 
+By application of the weakening lemma and rule \tsub, it follows that
+$\typerule{\Gamma''}{v}{T}{\Gamma'}$.
+
+\item $t = \ift{t_c}{t_t}{t_f}$. It follows by rule \tif that there exists
+$\Gamma_1$, $\Gamma_2$, $\Gamma_3$, $T_t$ and $T_f$ such that
+$\typerule{\Gamma}{t_c}{\boolt}{\Gamma_1}$ and that
+$\typerule{\Gamma_1}{t_t}{T_t}{\Gamma_2}$ and that
+$\typerule{\Gamma_2}{t_f}{T_f}{\Gamma_3}$ with
+$\Gamma' = \Gamma_2 \sqcup \Gamma_3$ and $T = T_t \sqcup T_f$. There are
+three possibilities for reduction:
+
+  \begin{itemize}
+  \item $t_c = \truev$. By \lemref{lem:valuectx} we have that
+  $\Gamma = \Gamma_1$. Reduction can occur by \riftrue such that
+  $\oprule{t}{\mu}{t_t}{\mu}$. By \tsub we have that
+  $\typerule{\Gamma_1}{t_t}{T}{\Gamma_2}$ as $T_t <: T$. Additionally, for
+  all $x \in \Gamma_2$, $\Gamma_2(x) <: \Gamma'(x)$. Therefore by
+  repeatedly applying \twiden for all $x$, we have that
+  $\typerule{\Gamma_1}{t_t}{T}{\Gamma'}$.
+  Let $\Gamma'' = \Gamma$, $\mu' = \mu$ and 
+  $t' = t_t$. Therefore, $\typerule{\Gamma''}{t'}{T}{\Gamma'}$ with
+  $\Gamma'' \vdash \mu'$.
+
+  \item $t_c = \falsev$. By \lemref{lem:valuectx} we have that
+  $\Gamma = \Gamma_1$. Reduction can occur by \riffalse such that
+  $\oprule{t}{\mu}{t_f}{\mu}$. By \tsub we hhave that
+  $\typerule{\Gamma_1}{t_f}{T}{\Gamma_3}$ as $T_f <: T$. Additionally, for
+  all $x \in \Gamma_3$, $\Gamma_3(x) <: \Gamma'(x)$. Therefore by
+  repeatedly applying \twiden for all $x$, we have that
+  $\typerule{\Gamma_1}{t_f}{T}{\Gamma'}$. Let $\Gamma'' = \Gamma$,
+  $\mu' = \mu$ and $t' = t_f$. Therefore, 
+  $\typerule{\Gamma''}{t'}{T}{\Gamma'}$ with $\Gamma'' \vdash \mu'$.
+
+  \item $t_c$ is not a value. By induction, there exists $t_c'$,
+  $\mu'$, $\Gamma''$ such that 
+  $\oprule{t_c}{\mu}{t_c'}{\mu'}$ and 
+  $\typerule{\Gamma''}{t_c'}{\boolt}{\Gamma_1}$ with $\Gamma'' \vdash \mu'$. 
+  Reduction of $t$ can therefore occur by \rifexpr such that
+  $\oprule{t}{\mu}{\ift{t_c'}{t_t}{t_f}}{\mu'}$. It follows
+  by \tif that $\typerule{\Gamma''}{\ift{t_c'}{t_t}{t_f}}{T}{\Gamma'}$.
+  \end{itemize}
+
+\end{itemize}
+\end{proof}
+
+\section{Supporting lemmas}
+\label{app:proofs}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:valuectx %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{lem}
+\label{lem:valuectx}
+If $v$ is a value and $\typerule{\Gamma}{v}{T}{\Gamma'}$, then $\Gamma = \Gamma'$.
+\end{lem}
+\begin{proof}
+Directly from the typing judgements. $v$ is either {\tt unit}, {\tt true},
+{\tt false}, a function literal or an object literal.
+Correspondingly, by rules \tunit,
+\ttrue, \tfalse, 
+\tfundef and \tobj, $\Gamma = \Gamma'$.
+\end{proof}
+
+\begin{lem}[Object state sets]
+Given an object state set $\overline{S}$ and a state $S'$, if
+$S' \in \overline{S}$ then $O@S' <: O@\overline{S}$.
+\end{lem}
+\begin{proof}
+$O@\overline{S}$ is defined as equivalent to
+$\bigsqcup_{S \in \overline{S}}{O@S}$. Given that $S \in \overline{S}$,
+we must have that $\overline{S} = \overline{S'} \cup \{ S \}$ for
+some $\overline{S'}$.
+it follows that $O@\overline{S} = O@S' \sqcup \left( 
+\bigsqcup_{S \in \overline{S'}}{O@S} \right)$.
+By the definition of join, 
+$O@S' <: O@S' \sqcup \bigsqcup_{S \in \overline{S}}{O@S}$.
+\end{proof}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:ssetinc  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{lem}
+\label{lem:ssetinc}
+Given an object protocol $O = \left\{ \overline{ S_i \{ ... \} } \right\}$ and two state sets 
+$\overline{S} \subseteq \overline{S'} \subseteq \overline{S_i}$, it follows
+that $O@\overline{S} <: O@\overline{S'}$.
+\end{lem}
+\begin{proof}
+From the definition of state sets, we have that 
+$O@\overline{S} = \bigsqcup_{S \in \overline{S}}{O@S}$ and that
+$O@\overline{S'} = \bigsqcup_{S \in \overline{S'}}{O@S}$.
+As $\overline{S} \subseteq \overline{S'}$ there exists an
+$\overline{S''}$ such that $\overline{S'} = \overline{S} \cup \overline{S''}$
+where $\overline{S} \cap \overline{S''} = \emptyset$. Therefore
+$O@\overline{S'} = \left(\bigsqcup_{S \in \overline{S}}{O@S}\right) \sqcup \left(\bigsqcup_{S' \in \overline{S'} - \overline{S}}{O@S'}\right)$.
+
+As $A <: A \sqcup B$ for all $A$ and $B$ where $A \sqcup B$ is defined, 
+it follows that $O@\overline{S} <: O@\overline{S'}$.
+\end{proof}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:remap %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{lem}
+\label{lem:remap}
+Given types $T$, $U$, and $V$, such that
+$\remapapp{T}{U}{V}$ is defined, it follows that $\remapapp{T}{U}{V} <: V$.
+\end{lem}
+\begin{proof}
+By case analysis of V.
+
+\begin{itemize}
+\item $V = \unitt$ or $V = \boolt$. By either \remapunit or \remapbool
+it must be the case that $U = V$. It must also be the case that
+$T = U$, as $\unitt$ and $\boolt$ do not have any subtypes other than
+themselves. Therefore $V = \remapapp{T}{U}{V} <: V$ by \subrefl.
+
+\item $V = \funv{V_i}{V_i'}{V'}$ for some $\overline{V_i}$, $\overline{V_i'}$
+and $V'$. By \remapfunc, $T <: U$ and $T = \remapapp{T}{U}{V}$. Therefore,
+$T <: V$.
+
+\item $V = O@\overline{S'}$ for some $O$ and $\overline{S'}$. By
+\remapobj, $O'@\overline{S'''} = \remapapp{T}{U}{V}$ where 
+$T = O'@\overline{S''}$ and $U = O@\overline{S}$ and
+$\overline{S'''} = \{ S | O'@S \sim O@\overline{S'}, S \in O' \}$ 
+for some $O'$, $\overline{S}$ and $\overline{S''}$. By \subobj,
+$T = O'@\overline{S'''} <: O@\overline{S'} = V$ as for each $S \in \overline{S'''}$,
+$O'@S <: O@\overline{S'}$.
+\end{itemize}
+\end{proof}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:remapcv %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{lem}[Remap is covariant]
+\label{lem:remapcv}
+Given types $T, T', U$ and $V$ such that $T <: T'$, 
+$\remapapp{T}{U}{V} <: \remapapp{T'}{U}{V}$.
+\end{lem}
+
+\begin{lem}
+\label{lem:remapeff}
+Given types $T$, $U$ and $V$ such that $U <: V$ and $T = \remapapp{U}{V}{V}$, 
+it follows that $U <: T$. \\
+(TODO: object portion needs reworked due to new definition of remap)
+\end{lem}
+\begin{proof}
+By case analysis of the type $V$.
+
+\begin{itemize}
+\item $V = \unitt$ or $V = \boolt$. 
+It must be the case that $V = U$ also, as $\unitt$ and $\boolt$
+have no subtypes other than themselves by rule \subrefl.
+Therefore, by rule \remapunit or \remapbool, $T = V$,
+and $U <: T$ by rule \subrefl.
+
+\item $V = \funv{T_i}{T_i'}{T_r}$ for some $\overline{T_i}$, $\overline{T_i'}$
+and $T_r$. As $U <: V$, it follows by rule \remapfunc that
+$T = U$, and $U <: T$ by \subrefl.
+
+\item $V = O@\overline{S}$ for some $O$ and $\overline{S}$. 
+It follows that $U = O'@\overline{S'}$ 
+for some $O'$ and $\overline{S'}$ 
+such that $O'@\overline{S'} \sim O@\overline{S}$ 
+by rule \subobj. 
+By rule \remapobj, it follows that $T = O'@\overline{S''}$ 
+such that $\overline{S''} = \{ S | O'@S \sim O@\overline{S}, S \in O' \}$.
+By \lemref{lem:ssetinc} it follows that 
+$O'@\overline{S'} <: O'@\overline{S''}$.
+
+\end{itemize}
+\end{proof}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:remapsame %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{cor}
+\label{lem:remapsame}
+Given a type $T$, $T <: \remapapp{T}{T}{T}$. \\
+(TODO: in fact, with the new definition of remap it should be possible to
+state that $T = \remapapp{T}{T}{T}$).
+\end{cor}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:upgrade %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{lem}[remap]
+\label{lem:upgrade}
+If a term $t$ can be typed such that 
+$\typerule{\Gamma, x : T}{t}{U}{\Gamma', x : V}$, and if
+$T' <: T$, then there exists a $V' <: \remapapp{T'}{T}{V}$ 
+such that $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+\end{lem}
+\begin{proof}
+by induction on the structure of $t$.
+The term $t$ is of one of the following forms:
+
+\begin{itemize}
+\item $t$ is a value, so by \lemref{lem:valuectx} it follows that
+$\Gamma = \Gamma'$ and $T = V$. 
+The environment can be arbitrary in the typing rules for values,
+therefore we can type $t$ such that 
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : T'}$.
+Let $V' = T'$.
+By \lemref{lem:remapeff}, we have that $V' <: \remapapp{T'}{T}{V}$.
+Therefore, $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+
+\item $t = \lett{y}{t'}{t''}$. It follows from the rule \tlet that
+$x \neq y$ (as variables cannot be rebound) and that there exists 
+$\Gamma_1, \Gamma_2, T_2, T_y, T_y'$ such that
+$\typerule{\Gamma, x : T}{t'}{T_y}{\Gamma_1, x : T_2}$ and that
+$\typerule{\Gamma_1, x : T_2, y : T_y}{t''}{U}{\Gamma', x : V, y : T_y'}$.
+By induction, it follows that there exists a type $V_2 <: \remapapp{T'}{T}{T_2}$ such that
+$\typerule{\Gamma, x : T'}{t'}{T_y}{\Gamma_1, x : V_2}$.
+By \lemref{lem:remap} we have that $V_2 <: T_2$.
+Therefore it also follows by induction that
+there exists a type $V_3 <: \remapapp{V_2}{T_2}{V}$
+such that
+$\typerule{\Gamma_1, x : V_2, y : T_y}{t''}{U}{\Gamma', x : T_3, y : V_3}$.
+Let $V' = V_3$. The rules of \tlet are satisfied such that
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+
+\item $t = y ( \overline{z_i} )$. 
+It follows from the rule \tfunc that there exists
+$\Gamma_1, \overline{T_i}, \overline{U_i}, \overline{V_i}, \overline{T_i'}$ 
+such that 
+$\Gamma, x : T = \Gamma_1, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i}$
+and that
+$\Gamma', x : V = \Gamma_1, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i'}$
+such that for each $i$, $T_i <: U_i$, $T_i' <: V_i$ 
+and $U <: U'$.
+
+There are three cases to consider:
+\begin{itemize}
+\item $x \neq y$ and $x \notin \overline{x_i}$, meaning that
+$\Gamma_1 = \Gamma_2, x : T$ for some $\Gamma_2$, that
+$\Gamma = \Gamma_2, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i}$
+and that $\Gamma' = \Gamma_2, y : \funt{U_i}{V_i}{U}, \overline{z_i : T_i'}$.
+Additionally, $T = V$. 
+It follows that $t$ can be typed without $x$
+such that $\typerule{\Gamma}{t}{U}{\Gamma'}$. Let $V' = T'$.
+By the weakening lemma, $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+By \lemref{lem:remapeff}, $V' <: \remapapp{T'}{T}{V}$.
+
+\item $x = y$, meaning $\Gamma = \Gamma_1, \overline{z_i : T_i}$ and
+$\Gamma' = \Gamma_1, \overline{z_i : T_i'}$. 
+Additionally, $T = V = \funt{U_i}{V_i}{U}$.
+$T'$ must therefore be of form $\funt{U_i'}{V_i'}{U'}$ 
+such that for each $i$, $U_i <: U_i'$, $V_i' <: V_i$, $U' <: U$ by the
+definition of subtyping. Let $V' = T'$.
+By \lemref{lem:remapeff}, $V' <: \remapapp{T'}{T}{V}$.
+It follows by rule \tfunc, and \tsub to replace $U'$ with $U$, that
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+
+\item $x \in \overline{z_i}$, meaning that $T = T_i$ and 
+$V = T_i' = \remapapp{T}{U_i}{V_i}$ for some $i$.
+Let $V' = \remapapp{T'}{U_i}{V_i}$. 
+By \lemref{lem:remapcv}, $V' <: V$.
+As $T' <: T$, we can type $t$ by rule \tfunc such that
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma, x : V'}$.
+
+\end{itemize}
+
+\item $t = y.m$. By the rule \tmethc it follows that
+$\Gamma, x : T = \Gamma_1, y : O@\overline{S}$
+and that
+$\Gamma', x : V = \Gamma_1, y : O@\overline{S'}$
+for some $\Gamma_1, O, \overline{S}$ and $\overline{S'}$
+where
+$\overline{S'} = \{ S_n | m : T_r \Rightarrow S_n \in O@S, S \in \overline{S} \}$.
+Additionally, 
+$U = \bigsqcup{ \{ T_r | m : T_r \Rightarrow S_n \in O@S, S \in \overline{S} \} }$.
+There are two cases to consider:
+
+\begin{itemize}
+\item $x = y$. It follows that $\Gamma = \Gamma_1 = \Gamma'$ and
+that $T = O@\overline{S}, V = O@\overline{S'}$.
+$T'$ must be of form $O'@\overline{S}''$ such that
+$O'@\overline{S}'' \sim O@\overline{S}$ by rule \subobj.
+
+Let $V' = O'@\overline{S}''' = \remapapp{T'}{T}{V}$
+where
+$S''' = \{ S_n' | m : T_r' \Rightarrow S_n' \in O'@S'', S'' \in \overline{S}''\}$.
+Let $U' = \bigsqcup{ \{ T_r' | m : T_r' \Rightarrow S_n' \in O'@S'', S'' \in \overline{S}'' \} }$.
+As $O'@\overline{S}'' \sim O@\overline{S}$, it follows that
+$O'@\overline{S}''' \sim O@\overline{S}'$.
+Therefore, $U' <: U$ and $V' <: V$. By the rule \tmethc, and \tsub
+to replace $U'$ with $U$, it follows that
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+
+\item $x \neq y$. It follows that $\Gamma = \Gamma'', y : O@\overline{S}$
+and that $\Gamma' = \Gamma'', y : O@\overline{S'}$
+for some $\Gamma''$, $O$ and $\overline{S}$, and that
+$T = V$.
+By rule \tmethc we have that $\typerule{\Gamma}{t}{U}{\Gamma'}$.
+Let $V' = T'$. By \lemref{lem:remapeff}, $V' <: \remapapp{T'}{T}{V}$.
+By the weakening lemma, 
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+
+\end{itemize}
+
+\item $t = t' ; t''$. It follows by rule \tlet that there exists
+$\Gamma'', V_{mid}, U'$ 
+such that $\typerule{\Gamma, x : T}{t'}{U'}{\Gamma'', x : V_{mid}}$
+and that $\typerule{\Gamma'', x : V_{mid}}{t''}{U}{\Gamma', x : V}$.
+By induction, it follows that there exists $V_{mid}' <: \remapapp{T'}{T}{V_{mid}}$ 
+such that $\typerule{\Gamma, x : T'}{t'}{U'}{\Gamma'', x : V_{mid}'}$.
+By \lemref{lem:remap} we have that $V_{mid}' <: V_{mid}$.
+There it also follows by induction that 
+there exists $V_{end} <: \remapapp{V_{mid}'}{V_{mid}}{V}$ such that
+$\typerule{\Gamma'', x : V_{mid}'}{t''}{U}{\Gamma'', x : V_{end}}$.
+Let $V' = V_{end}$. By rule \tlet it follows that
+$\typerule{\Gamma, x : T'}{t' ; t''}{U}{\Gamma'', x : V'}$.
+
+\item $t = \ift{t_c}{t_t}{t_f}$. It follows from rule \tif that there
+exists $\Gamma_1$, $\Gamma_2$, $\Gamma_3$, $U_t$, $U_f$, $V_c$, $V_t$ and
+$V_f$
+such that
+$\typerule{\Gamma, x : T}{t_c}{\boolt}{\Gamma_1, x : V_c}$ and that
+$\typerule{\Gamma_1, x : V_c}{t_t}{U_t}{\Gamma_2, x : V_t}$ and that
+$\typerule{\Gamma_1, x : V_c}{t_f}{U_f}{\Gamma_3, x : V_f}$ with
+$\Gamma' = \Gamma_2 \sqcup \Gamma_3$, $U = U_t \sqcup U_f$ and
+$V = V_t \sqcup V_f$.
+
+By induction, there exists a $V_c' <: \remapapp{T'}{T}{V_c}$
+such that $\typerule{\Gamma, x : T'}{t_c}{\boolt}{\Gamma_1, x : V_c'}$.
+By \lemref{lem:remap} we also have that $V_c' <: V_c$.
+Therefore by induction there also exists a 
+$V_t' <: \remapapp{V_c'}{V_c}{V_t}$ and $V_f' <: \remapapp{V_c'}{V_c}{V_f}$
+such that $\typerule{\Gamma_1, x : V_c'}{t_t}{T_t}{\Gamma_2, x : V_t'}$
+and that $\typerule{\Gamma_1, x : V_c'}{t_f}{T_f}{\Gamma_3, x : V_f'}$.
+By \lemref{lem:remap} we also have that $V_t' <: V_t$ and that
+$V_f' <: V_f$.
+Let $V' = V_t' \sqcup V_f'$. By the definition of join, $V' <: V$.
+It follows by rule \tif that
+$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
+
+\end{itemize}
+\end{proof}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:weakening %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{lem}[Weakening]
+\label{lem:weakening}
+If $\typerule{\Gamma}{t}{T}{\Gamma'}$,
+then for all $\Gamma''$ such that $dom(\Gamma) \cap dom(\Gamma'') = \emptyset$,
+$t$ can also be typed such that
+$\typerule{\Gamma, \Gamma''}{t}{T}{\Gamma', \Gamma''}$.
+\end{lem}
+\begin{proof}
+by induction on the structure of $t$.
+
+If $t$ is some value $v$, it follows by \lemref{lem:valuectx} that 
+$\Gamma = \Gamma'$ and that the typing derivation will still be valid as long
+as the input and output contexts are identical. Therefore,
+$\typerule{\Gamma , \Gamma''}{v}{T}{\Gamma', \Gamma''}$.
+
+If $t$ is not a value, then it is of one of the following forms:
+
+\begin{itemize}
+\item $t = \lett{x}{t'}{t''}$. It follows from rule \tlet that
+there exists $\Gamma_1, \Gamma_2, T', T''$ such that
+$\typerule{\Gamma}{t'}{T'}{\Gamma_1}$ and
+$\typerule{\Gamma_1, x : T'}{t''}{T}{\Gamma', x : T''}$.
+By \tlet we have that $dom(\Gamma') = dom(\Gamma)$.
+By induction, $t'$ can be typed such
+that $\typerule{\Gamma,\Gamma''}{t'}{T'}{\Gamma_1,\Gamma''}$,
+and $t''$ can be typed such that
+$\typerule{\Gamma_1, \Gamma'', x : T'}{t''}{T}{\Gamma', \Gamma'', x : T''}$,
+as we can assume by Barendregt's convention that $x$ can be made distinct from
+any variable names in $\Gamma''$ by relabeling $x$.
+Therefore,
+$\typerule{\Gamma, \Gamma''}{\lett{x}{t'}{t''}}{T}{\Gamma', \Gamma''}$.
+
+\item $t = x ( \overline{x_i} )$. It follows from the rule \tfunc that
+there exists a $\Gamma_1, \overline{T_i}, \overline{U_i}, \overline{V_i}, \overline{T_i'}$ 
+such that 
+$\Gamma = \Gamma_1, x : (\overline{U_i \gg V_i}) \rightarrow T, \overline{x_i : T_i}$
+and that
+$\Gamma' = \Gamma_1, x : (\overline{U_i \gg V_i}) \rightarrow T, \overline{x_i : T_i'}$.
+As $\Gamma_1$ can be arbitrary in the rule \tfunc, it follows that we
+can extend the input and output contexts such that
+$\typerule{\Gamma, \Gamma''}{x ( \overline{x_i} )}{T}{\Gamma', \Gamma''}$.
+
+\item $t = x.m$. It follows from the rule \tmethc that there exists
+a $\Gamma_1$ such that $\Gamma = \Gamma_1, x : O@\overline{S}$ and that 
+$\Gamma' = \Gamma_1, x : O@\overline{S'}$.
+As $\Gamma_1$ can be arbitrary in rule \tmethc, it follows that we can
+extend the input and out contexts such that
+$\typerule{\Gamma, \Gamma''}{x.m}{T}{\Gamma', \Gamma''}$.
+
+\item $t = t' ; t''$. It follows from the rule \tseq that there exists
+$\Gamma_1$ and $T'$ such that $\typerule{\Gamma}{t'}{T'}{\Gamma_1}$
+and $\typerule{\Gamma_1}{t''}{T}{\Gamma'}$. By induction
+$\typerule{\Gamma, \Gamma''}{t'}{T'}{\Gamma_1, \Gamma''}$
+as $dom(\Gamma_1) \subseteq dom(\Gamma)$ and therefore
+$\Gamma_1$ and $\Gamma''$ are disjoint.
+Similarly, as $dom(\Gamma_1) = dom(\Gamma')$, by induction
+$\typerule{\Gamma_1, \Gamma''}{t''}{T}{\Gamma', \Gamma''}$.
+Therefore $\typerule{\Gamma, \Gamma''}{t'}{T'}{\Gamma_1, \Gamma''}$.
+
+\item $t = \ift{t_c}{t_t}{t_f}$. It follows from rule \tif that there
+exists $\Gamma_1$, $\Gamma_2$, $\Gamma_3$, $T_t$ and $T_f$ such that
+$\typerule{\Gamma}{t_c}{\boolt}{\Gamma_1}$ and that
+$\typerule{\Gamma_1}{t_t}{T_t}{\Gamma_2}$ and that
+$\typerule{\Gamma_1}{t_f}{T_f}{\Gamma_3}$ with
+$\Gamma' = \Gamma_2 \sqcup \Gamma_3$ and $T = T_t \sqcup T_f$.
+By induction each of $\Gamma_1$, $\Gamma_2$ and $\Gamma_3$ can
+be extended by $\Gamma''$ in the typing judgements for $t_c$,
+$t_t$ and $t_f$. As $\Gamma'' \sqcup \Gamma'' = \Gamma''$, it
+follows that $(\Gamma_2, \Gamma'') \sqcup (\Gamma_3, \Gamma'') = 
+\Gamma_2 \sqcup \Gamma_3, \Gamma''$ and therefore $t$ can be
+typed such that $\typerule{\Gamma, \Gamma''}{t}{T}{\Gamma', \Gamma''}$.
+
+\end{itemize}
+
+\end{proof}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:subst %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{lem}[Substitution]
+\label{lem:subst}
+If $\typerule{\Gamma}{t}{T}{\Gamma'}$, then
+$\typerule
+{\subst{x_i}{y_i}{\Gamma}}
+{\subst{x_i}{y_i}{t}}
+{T}
+{\subst{x_i}{y_i}{\Gamma'}}$
+where each $x_i$ and $y_i$ is distinct, and $\overline{x_i} \cap \overline{y_i} = \emptyset$.
+\end{lem}
+\begin{proof}
+by induction on the structure of $t$.
+
+If $t$ is some value $v$, then $\Gamma = \Gamma'$, therefore
+$\subst{x_i}{y_i}{\Gamma} = \subst{x_i}{y_i}{\Gamma'}$
+and substitution has no effect on the value, which has no specific requirements
+of either $\Gamma$ or $\Gamma'$ other than that they are equal.
+Therefore, $\typerule{\subst{x_i}{y_i}{\Gamma}}{\subst{x_i}{y_i}{v}}{T}{\subst{x_i}{y_i}{\Gamma'}}$.
+
+If $t$ is a term, then it is of one of the following forms:
+
+\begin{itemize}
+\item $t = \lett{x}{t''}{t'}$. 
+Substitution is defined on this term such that \\
+$\subst{x_i}{y_i}{t} \equiv 
+\lett{x}{( \subst{x_i}{y_i}{t''} )}{(\subst{x_j}{y_j}{t'})}$
+, where $\overline{y_j} = \overline{y_i} - \{ x \}$.
+
+By rule \tlet, it follows
+that there exists $T', T'', \Gamma_1$ such that
+$\typerule{\Gamma}{t''}{T''}{\Gamma_1}$ and that
+$\typerule{\Gamma_1, x : T''}{t''}{T}{\Gamma', x : T'}$.
+Additionally, $x \notin dom(\Gamma)$.
+
+By induction, $t''$ can be substituted such that 
+$\typerule
+{\subst{x_i}{y_i}{\Gamma}}
+{\subst{x_i}{y_i}{t''}}
+{\subst{x_i}{y_i}{\Gamma_1}}
+$.
+Additionally, $t'$ can be substituted such that
+$(\subst{x_j}{y_j}{\Gamma_1}) , x : T'' \triangleright \subst{x_j}{y_j}{t''} \triangleleft \{ (\overline{x_j / y_j} \} \Gamma') , x : T'$ as it is guaranteed that $x \notin \overline{y_j}$.
+As $dom(\Gamma') = dom(\Gamma)$, and that $x \notin dom(\Gamma)$, it follows that $\subst{x_i}{y_i}{\Gamma_1} = (\subst{x_j}{y_j}{\Gamma_1})$ and
+that $\overline{x_i / y_i} \} \Gamma' = \overline{x_j / y_j} \} \Gamma'$.
+
+Therefore, the requirements of \tlet are satisfied such that
+$\typerule{\subst{x_i}{y_i}{\Gamma}}{\subst{x_i}{y_i}{t}}{T}{\subst{x_i}{y_i}{\Gamma'}}$.
+
+\item $t = t_l ; t_r$.
+Substitution is defined on this term such that
+$\{ \overline{x_i / y_i} \} ( t_l ; t_r ) \equiv \subst{x_i}{y_i}{t_l} ; \subst{x_i}{y_i}{t_r}$.
+
+By rule \tseq, there exists $\Gamma'', T'$ such that
+$\typerule{\Gamma}{t_l}{T'}{\Gamma''}$ and
+$\typerule{\Gamma''}{t_r}{T}{\Gamma'}$. By induction,
+$\typerule{\subst{x_i}{y_i}{\Gamma}}{\subst{x_i}{y_i}{t_l}}{T'}{\subst{x_i}{y_i}{\Gamma''}}$ and
+$\typerule{\subst{x_i}{y_i}{\Gamma''}}{\subst{x_i}{y_i}{t_r}}{T}{\subst{x_i}{y_i}{\Gamma'}}$.
+Therefore, $t$ can by typed \tseq after the substitution.
+
+\item $t = x_0 ( \overline{x_k} )$.
+Substition is defined on this term such that
+$\subst{x_i}{y_i}{x_0} ( \overline{x_k} ) \equiv y_0 ( \overline{y_k} )$
+where for each $x \in \{ x_0, \overline{x_k} \}$,
+$x = y_j \implies y = x_j$, otherwise $y$ is the original value.
+
+For each substitution that occurs in the term, the variable must exist in
+both the input and output contexts by rule \tfunc, and will be substituted
+for the same name. Therefore, $t$ can be typed by \tfunc after the
+substitution.
+
+\item $t = x.m$.
+Substition is defined on this term such that
+$\subst{x_i}{y_i}{x.m} \equiv y.m$
+where $y = x_j$ if $x = y_j$ for some $y_j \in \overline{y_i}$.
+Otherwise, $y = x$.
+
+Rule \tmethc requires that $x$ exist in both $\Gamma$ and $\Gamma'$ and
+therefore any substitution of x in the term will be matched with the
+same substitution in the contexts. Therefore, $t$ can be typed by
+\tmethc after the substitution.
+
+\item $t = \ift{t_c}{t_t}{t_f}$. Substitution is defined on this term such
+that \\
+$\subst{x_i}{y_i}{(\ift{t_c}{t_t}{t_f})} \equiv 
+\ift{\substxy{t_c}}{\substxy{t_t}}{\substxy{t_f}}$.
+By rule \tif there exists $\Gamma_1$, $\Gamma_2$, $\Gamma_3$, $T_t$, $T_f$
+such that
+$\typerule{\Gamma}{t_c}{\boolt}{\Gamma_1}$ and that
+$\typerule{\Gamma_1}{t_t}{T_t}{\Gamma_2}$ and that
+$\typerule{\Gamma_1}{t_f}{T_f}{\Gamma_3}$ where
+$\Gamma' = \Gamma_2 \sqcup \Gamma_3$ and $T = T_t \sqcup T_f$. By induction
+substitution can be performed on $t_c$, $t_t$ and $t_f$ such that
+$\typerule{\substxy{\Gamma}}{\substxy{t_c}}{\boolt}{\substxy{\Gamma_1}}$ and that
+$\typerule{\substxy{\Gamma_1}}{\substxy{t_t}}{T_t}{\substxy{\Gamma_2}}$ and
+$\typerule{\substxy{\Gamma_1}}{\substxy{t_f}}{T_f}{\substxy{\Gamma_3}}$.
+By the definition of substitution on contexts, 
+$\substxy{\Gamma_2} \sqcup \substxy{\Gamma_3} = \substxy{\Gamma'}$. Therefore,
+by rule \tif, 
+$\typerule{\substxy{\Gamma}}{\substxy{\ift{t_c}{t_t}{t_f}}}{T}{\substxy{\Gamma'}}$.
+\end{itemize}
+\end{proof}
+
+\bibliographystyle{abbrvnat}
+\bibliography{refs}
+
+% The bibliography should be embedded for final submission.
+
+%\begin{thebibliography}{}
+%\softraggedright
+
+%\bibitem[Smith et~al.(2009)Smith, Jones]{smith02}
+%P. Q. Smith, and X. Y. Jones. ...reference text...
+
+%\end{thebibliography}
+
+\end{document}

@@ -293,8 +293,7 @@ object ConstraintGenerator {
   def ifConstraints(t : If) =
     (ConstraintSet() +
       EqualityConstraint(VarTE(t.condition->typeVar), BoolTE) +
-      SubtypeConstraint(VarTE(t.whenTrue->typeVar), VarTE(t->typeVar)) +
-      SubtypeConstraint(VarTE(t.whenFalse->typeVar), VarTE(t->typeVar)) +
+      JoinConstraint(VarTE(t->typeVar), VarTE(t.whenTrue->typeVar), VarTE(t.whenFalse->typeVar)) +
       ContextConstraint(t.condition->inContextVar, sameAs(t->inContextVar)) +
       ContextConstraint(t.whenTrue->inContextVar, sameAs(t.condition->outContextVar)) +
       ContextConstraint(t.whenFalse->inContextVar, sameAs(t.condition->outContextVar)) +

@@ -6,5 +6,7 @@ target
 *.log
 *.fdb_latexmk
 *.fls
+*.bbl
+*.blg
 formalism/ts_defns.tex
 

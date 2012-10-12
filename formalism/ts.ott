@@ -156,8 +156,6 @@ C :: 'C_' ::=
     {{ com context constr. }}
   | tyc                           ::  :: Type
     {{ com type constr. }}
-  | protoc                        ::  :: Protocol
-    {{ com protocol constr. }}
   | C ^ C'                        ::  :: CAnd
     {{ com conjunction }}
 
@@ -190,14 +188,8 @@ tyc {{ tex \mathcal{T} }} :: 't_' ::=
     {{ com type variable }}
   | tinf = tinf'              ::  :: Equality
     {{ com equality  }}
-  | tinf <: tinf'             ::  :: Subtype
-    {{ com subtyping }}
-
-
-protoc {{ tex \mathcal{P} }} :: 'p_' ::=
-{{ com protocol constraints }}
-  | m : tinf => a setin a' @ a''   ::  :: Method
-    {{ com method }}
+  | tinf = tinf' join tinf''  ::  :: Join
+    {{ com join }}
 
 
 tinf {{ tex \mathbb{T} }} :: 'TInf_' ::=
@@ -210,12 +202,13 @@ tinf {{ tex \mathbb{T} }} :: 'TInf_' ::=
     {{ com unit }}
   | ( </ tinfi >> tinfi' // i /> ) -> tinf  ::  :: FunType
     {{ com function }}
+  | remap ( tinf , tinf' >> tinf'' )        ::  :: Remap
 
 
 oinf {{ tex \mathbb{O} }} :: 'OInf_' ::=
-  | a @ a'                                  ::  :: Inferred
+  | partial { </ sinfi // i /> } @ SSet     ::  :: Inferred
     {{ com inferred object }}
-  | { </ sinfi // i /> } @ S                ::  :: Known
+  | known { </ sinfi // i /> } @ SSet       ::  :: Known
     {{ com known object }}
 
 sinf {{ tex \mathbb{S} }} :: 'SInf_' ::=
@@ -579,16 +572,16 @@ defns Jty :: '' ::=
   S in SSet
   ::  ::fakesetinclude::'fsi_'
   {{ tex S \in \overline{S} }} by
-  
+
   defn
-  SSet' = SimExtract ( O , O' @ SSet )
+  SSet3 = SimExtract ( O1 , SSet1 , O2 , SSet2 , SSet4 )
   ::  ::statesimextract::'sim_' 
-  {{ tex [[SSet']] = \{ S \: | \: [[O]] @ S \sim O' @ [[SSet]], S \in [[O]] \} }}
+  {{ tex [[SSet3]] = \bigcup \{ \overline{ S_{out} } \: | \: ( [[O1]] @ [[SSet1]] , [[O2]] @ [[SSet2]] ) \lesssim ( [[O1]] @ \overline{ S_{out} } , [[O2]] @ [[SSet4]] ) \} }}
   by
 
   defn
   T' = remap ( T , U >> V )
-  ::  ::objeffextract::'remap_'
+  ::  ::remap::'remap_'
   {{ com [[T']] is the remapped output of effect type [[U]] [[>>]] [[V]] given input [[T]] }}
   by
 
@@ -606,7 +599,7 @@ defns Jty :: '' ::=
     T = remap ( T , U >> U )
 
     O @ SSet <: O' @ SSet2
-    SSet4 = SimExtract ( O , O' @ SSet3 )
+    SSet4 = SimExtract ( O , SSet, O' , SSet2 , SSet3 )
     --------------------- :: obj
     O @ SSet4 = remap ( O @ SSet , O' @ SSet2 >> O' @ SSet3 )
 

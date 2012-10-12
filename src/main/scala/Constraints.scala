@@ -27,6 +27,10 @@ case class SubtypeConstraint(a : TypeExpr, b : TypeExpr) extends Constraint {
   override def toString = a + " <: " + b
 }
 
+case class JoinConstraint(a : TypeExpr, left : TypeExpr, right : TypeExpr) extends Constraint {
+  override def toString = a + " = " + left + " ∨ " + right
+}
+
 /** 
  * Represents evidence that the specified context variable must be
  * composed of some other context and some explicit modifications,
@@ -131,12 +135,14 @@ case class ConstraintSet(
     cvcs : Seq[ContextVarConstraint] = Seq.empty,
     tecs : Seq[EqualityConstraint] = Seq.empty,
     scs : Seq[SubtypeConstraint] = Seq.empty,
+    jcs : Seq[JoinConstraint] = Seq.empty,
     mcs : Seq[MethodConstraint] = Seq.empty) {
 
   def +(cc : ContextConstraint) = this.copy(ccs = cc +: ccs)
   def +(cvc : ContextVarConstraint) = this.copy(cvcs = cvc +: cvcs)
   def +(tec : EqualityConstraint) = this.copy(tecs = tec +: tecs)
   def +(sc : SubtypeConstraint) = this.copy(scs = sc +: scs)
+  def +(jc : JoinConstraint) = this.copy(jcs = jc +: jcs)
   def +(mc : MethodConstraint) = this.copy(mcs = mc +: mcs)
   
 
@@ -146,11 +152,12 @@ case class ConstraintSet(
       cvcs ++ others.cvcs,
       tecs ++ others.tecs,
       scs ++ others.scs,
+      jcs ++ others.jcs,
       mcs ++ others.mcs)
 
   override def toString = {
     val sortedCcs = ccs.sortBy(_.context.v)
-    val typeCs = tecs ++ scs
+    val typeCs = tecs ++ scs ++ jcs
     ("context constraints:\n\t" +
       (if (sortedCcs.isEmpty) "none" else sortedCcs.mkString("\n\t")) +
       "\nvar constraints:\n\t" +
@@ -164,7 +171,7 @@ case class ConstraintSet(
 
   def toStringSimple = {
     val sortedCcs = ccs.sortBy(_.context.v)
-    (sortedCcs ++ cvcs ++ tecs ++ scs ++ mcs).mkString("; ")
+    (sortedCcs ++ cvcs ++ tecs ++ scs ++ jcs ++ mcs).mkString("; ")
   }
 }
 
