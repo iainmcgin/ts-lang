@@ -12,23 +12,19 @@
 package uk.ac.gla.dcs.ts
 
 sealed abstract class Constraint
-
+sealed abstract class TypeConstraint extends Constraint
 /** 
  * Represents evidence that a must be an equivalent type to b.
  */
-case class EqualityConstraint(a : TypeExpr, b : TypeExpr) extends Constraint {
+case class EqualityConstraint(a : TypeExpr, b : TypeExpr) extends TypeConstraint {
   override def toString = a + " = " + b
 }
 
 /**
  * Represents evidence that a must be a subtype of b.
  */
-case class SubtypeConstraint(a : TypeExpr, b : TypeExpr) extends Constraint {
+case class SubtypeConstraint(a : TypeExpr, b : TypeExpr) extends TypeConstraint {
   override def toString = a + " <: " + b
-}
-
-case class JoinConstraint(a : TypeExpr, left : TypeExpr, right : TypeExpr) extends Constraint {
-  override def toString = a + " = " + left + " ∨ " + right
 }
 
 /** 
@@ -52,22 +48,6 @@ case class ContextVarConstraint(
   typeExpr : TypeExpr) extends Constraint {
 
   override def toString = varName + " : " + typeExpr + " ∈ " + context
-}
-
-/**
- * Represents evidence that an object in the specified type and state
- * must support a call to the named method with the specified return
- * type and state transition.
- */
-case class MethodConstraint(
-  objVar : TypeVar,
-  stateVar : TypeVar,
-  method : String,
-  retType : TypeExpr,
-  nextState : TypeVar) extends Constraint {
-
-  override def toString = method + " : " + retType + " ⇒ " + nextState + 
-    " ∈ " + objVar + "@" + stateVar
 }
 
 sealed abstract class ContextDefinition
@@ -116,7 +96,7 @@ case class ContextRemoval(base : ContextVar, removedVar : String)
 case class ContextJoin(left : ContextVar, right : ContextVar)
   extends ContextDefinition {
 
-  override def toString = left + " ∨ " + right
+  override def toString = left + " ⊔ " + right
 }
 
 /**
@@ -134,16 +114,12 @@ case class ConstraintSet(
     ccs : Seq[ContextConstraint] = Seq.empty,
     cvcs : Seq[ContextVarConstraint] = Seq.empty,
     tecs : Seq[EqualityConstraint] = Seq.empty,
-    scs : Seq[SubtypeConstraint] = Seq.empty,
-    jcs : Seq[JoinConstraint] = Seq.empty,
-    mcs : Seq[MethodConstraint] = Seq.empty) {
+    scs : Seq[SubtypeConstraint] = Seq.empty) {
 
   def +(cc : ContextConstraint) = this.copy(ccs = cc +: ccs)
   def +(cvc : ContextVarConstraint) = this.copy(cvcs = cvc +: cvcs)
   def +(tec : EqualityConstraint) = this.copy(tecs = tec +: tecs)
   def +(sc : SubtypeConstraint) = this.copy(scs = sc +: scs)
-  def +(jc : JoinConstraint) = this.copy(jcs = jc +: jcs)
-  def +(mc : MethodConstraint) = this.copy(mcs = mc +: mcs)
   
 
   def ++(others : ConstraintSet) =
@@ -151,27 +127,23 @@ case class ConstraintSet(
       ccs ++ others.ccs, 
       cvcs ++ others.cvcs,
       tecs ++ others.tecs,
-      scs ++ others.scs,
-      jcs ++ others.jcs,
-      mcs ++ others.mcs)
+      scs ++ others.scs)
 
   override def toString = {
     val sortedCcs = ccs.sortBy(_.context.v)
-    val typeCs = tecs ++ scs ++ jcs
+    val typeCs = tecs ++ scs
     ("context constraints:\n\t" +
       (if (sortedCcs.isEmpty) "none" else sortedCcs.mkString("\n\t")) +
       "\nvar constraints:\n\t" +
       (if (cvcs.isEmpty) "none" else cvcs.mkString("\n\t")) +
       "\ntype constraints:\n\t" +
-      (if (typeCs.isEmpty) "none" else typeCs.mkString("\n\t")) +
-      "\nmethod constraints:\n\t" +
-      (if(mcs.isEmpty) "none" else mcs.mkString("\n\t"))
+      (if (typeCs.isEmpty) "none" else typeCs.mkString("\n\t"))
     )
   }
 
   def toStringSimple = {
     val sortedCcs = ccs.sortBy(_.context.v)
-    (sortedCcs ++ cvcs ++ tecs ++ scs ++ jcs ++ mcs).mkString("; ")
+    (sortedCcs ++ cvcs ++ tecs ++ scs).mkString("; ")
   }
 }
 

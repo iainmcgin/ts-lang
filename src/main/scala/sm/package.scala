@@ -23,6 +23,7 @@ package object sm {
     new TransitionAssoc(e)
 
   type StateGraph = Graph[State,Transition]
+  type StatePair = Pair[State,State]
 
   def emptySM = StateMachine(
     Graph(State("S")),

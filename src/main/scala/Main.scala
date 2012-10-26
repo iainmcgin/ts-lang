@@ -103,8 +103,7 @@ object Driver extends ParsingREPL[Command] with REPLParser {
 
     solver.solveTypeConstraints(contexts, 
       eqConstraints, 
-      subConstraints,
-      constraints.mcs)
+      subConstraints)
 
     if(debug) enableLogging()
     val solutionOpt = ConstraintSolver.solvePolymorphic(constraints, t)

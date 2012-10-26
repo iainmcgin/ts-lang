@@ -24,7 +24,7 @@ libraryDependencies ++= Seq(
   "jline" % "jline" % "2.7",
   "org.clapper" %% "grizzled-slf4j" % "0.6.9",
   "ch.qos.logback" % "logback-classic" % "1.0.6",
-  "com.assembla.scala-incubator" % "graph-core_2.9.2" % "1.5.1"
+  "com.assembla.scala-incubator" %% "graph-core" % "1.5.1"
 )
 
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.8.3")
@@ -32,3 +32,5 @@ addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.8.3")
 assemblySettings
 
 mainClass in assembly := Some("uk.ac.gla.dcs.ts.Driver")
+
+test in assembly := {}

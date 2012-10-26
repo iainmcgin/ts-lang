@@ -11,6 +11,8 @@
 
 package uk.ac.gla.dcs.ts.sm
 
+import uk.ac.gla.dcs.ts.UnitTE
+
 import scalax.collection.Graph
 import scalax.collection.GraphPredef._
 import scalax.collection.GraphEdge._
@@ -23,7 +25,7 @@ import org.scalatest.matchers.ShouldMatchers
 
 class FSMTest extends FunSuite with ShouldMatchers {
 
-  def m(s : String) = Method(s)
+  def m(s : String) = Method(s, UnitTE)
 
   val s = new StateGenerator()
 
@@ -34,10 +36,10 @@ class FSMTest extends FunSuite with ShouldMatchers {
   val E = State("E")
   val X = State("X")
 
-  val ma = Method("a")
-  val mb = Method("b")
-  val mc = Method("c")
-  val md = Method("d")
+  val ma = Method("a", UnitTE)
+  val mb = Method("b", UnitTE)
+  val mc = Method("c", UnitTE)
+  val md = Method("d", UnitTE)
 
   def aOrB = StateMachine(Graph(A ~> B by ma, A ~> C by mb), A, Set(B, C))
   def aOrC = StateMachine(Graph(A ~> B by ma, A ~> C by mc), A, Set(B, C))

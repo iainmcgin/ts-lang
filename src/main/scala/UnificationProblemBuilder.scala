@@ -71,25 +71,20 @@ class UnificationProblemBuilder {
 
     val (eqsWithRefsByVariable, noVarEqs) = (varConstraints.foldLeft
       (Pair(Map.empty[TypeVar,EqWithRefs], List.empty[MultiEquation]))
-      ((p,c) => {
+      ((p,constraint) => {
         val m = p._1
         val l = p._2
 
-        log.debug("processing " + c)
-        val res = (c.a, c.b) match {
+        log.debug("processing " + constraint)
+        val res = (constraint.a, constraint.b) match {
           case (VarTE(v), VarTE(otherVar)) => {
-            val (eq, varsInEq) = m.getOrElse(v, emptyEq(v))
-            val (eq2, varsInEq2) = m.getOrElse(otherVar, emptyEq(otherVar))
-            val merged = Pair(eq.merge(eq2), varsInEq ++ varsInEq2)
-            val dupReferences = varsInEq intersect varsInEq2
-
-            log.debug("eq = " + merged._1)
-
-            val m2 = fixReferenceCount(dupReferences, m, -1)
-            Pair(pointVarsToEq(m2, merged), l)
+            Pair(varEquality(m, v, otherVar), l)
           }
           case (VarTE(v), te) => Pair(processVarToTypeEquality(m, v, te), l)
           case (te, VarTE(v)) => Pair(processVarToTypeEquality(m, v, te), l)
+          case (ObjectTE(objVar,_), RemapTE(ObjectTE(objVar2,_),_)) => {
+            Pair(varEquality(m, objVar, objVar2), l)
+          }
           case (te1, te2) => {
             val (mt1, vmt1) = typeToMultiTerm(te1)
             val (mt2, vmt2) = typeToMultiTerm(te2)
@@ -113,6 +108,23 @@ class UnificationProblemBuilder {
     val allEqs = eqsWithRefsByVariable.values.map(_._1).toSet ++ noVarEqs
     log.debug("all eqs: " + allEqs)
     allEqs
+  }
+
+  private def varEquality(
+    varMap : Map[TypeVar, EqWithRefs], 
+    v1 : TypeVar, 
+    v2 : TypeVar) 
+    : Map[TypeVar, EqWithRefs] = {
+
+    val (eq, varsInEq) = varMap.getOrElse(v1, emptyEq(v1))
+    val (eq2, varsInEq2) = varMap.getOrElse(v2, emptyEq(v2))
+    val merged = Pair(eq.merge(eq2), varsInEq ++ varsInEq2)
+    val dupReferences = varsInEq intersect varsInEq2
+
+    log.debug("eq = " + merged._1)
+
+    val varMap2 = fixReferenceCount(dupReferences, varMap, -1)
+    pointVarsToEq(varMap2, merged)
   }
 
   private def processVarToTypeEquality(eqsByVar : Map[TypeVar, EqWithRefs],
@@ -178,12 +190,14 @@ class UnificationProblemBuilder {
         val vars = objVars ++ stVars
         Pair(MultiTerm(TypeUtil.OBJ_LABEL, List(objVarEq, stVarEq)), vars)
       }
+      /*
       case SolvedObjectTE(objVar, states, stateVar) => {
         val (objVarEq, objVars) = typeToTempEq(VarTE(objVar))
         val (stVarEq, stVars) = typeToTempEq(VarTE(stateVar))
         val vars = objVars ++ stVars
         Pair(MultiTerm(TypeUtil.OBJ_LABEL, List(objVarEq, stVarEq)), vars)
       }
+      */
       case VarTE(_) => 
         throw new IllegalArgumentException("type variables cannot be multiterms")
     }

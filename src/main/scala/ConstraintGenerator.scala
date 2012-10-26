@@ -11,9 +11,14 @@
 
 package uk.ac.gla.dcs.ts
 
+import sm._
+
 import org.kiama._
 import org.kiama.attribution.Attribution._
 import org.kiama.attribution.Attributable
+
+import scalax.collection.GraphPredef._
+import scalax.collection.Graph
 
 object ConstraintGenerator {
   
@@ -85,22 +90,19 @@ object ConstraintGenerator {
   def allConstraints(t : Term) : ConstraintSet =
     (t->constraints) ++ 
     (t match {
-      case UnitValue() => ConstraintSet()
-      case TrueValue() => ConstraintSet()
-      case FalseValue() => ConstraintSet()
       case o @ ObjValue(states,_) => methodConstraints(o)
       case FunValue(_,body) => allConstraints(body)
       case LetBind(_,value,body) => 
         allConstraints(value) ++ allConstraints(body)
       case Update(_, body) => allConstraints(body)
-      case MethCall(_,_) => ConstraintSet()
       case Sequence(left, right) => 
         allConstraints(left) ++ allConstraints(right)
-      case FunCall(_,_) => ConstraintSet()
       case If(cond,thn,els) => 
         allConstraints(cond) ++ allConstraints(thn) ++ allConstraints(els)
+      case _ => ConstraintSet()
     })
 
+  /** Generates the constraints for the return types of each method */
   def methodConstraints(o : ObjValue) =
     (o.states.foldLeft
       (ConstraintSet())
@@ -155,31 +157,15 @@ object ConstraintGenerator {
     )
   }
 
+  /** Creates an object type directly for an object value */
   def createSolvedObject(o : ObjValue) = {
-    val stateMap = 
-      (o.states.foldLeft
-        (Map.empty[String,StateDef])
-        ((m, s) => m + (s.name -> s))
-      )
-
-    val getStateVar = ((name : String) => 
-      stateMap.get(name).map(state => state->stateVar).getOrElse {
-      throw new IllegalArgumentException(
-            "state " + name + "missing")
-    })
+    var stateMap = Map.empty[TypeVar, Set[String]]
+    var g : StateGraph = Graph()
+    // TODO
 
     SolvedObjectTE(
-      o->objVar,
-      o.states.map(state => {
-        StateTE(state->stateVar, state.methods.map(m => {
-          MethodTE(
-            m.name, 
-            VarTE((m.ret)->typeVar), 
-            getStateVar(m.nextState)
-          )
-        }))
-      }),
-      o->objInitStateVar
+      g,
+      stateMap(o->objInitStateVar)
     )
   }
 
@@ -256,15 +242,14 @@ object ConstraintGenerator {
       (paramTypeVars.foldLeft
         (ConstraintSet())
         ((c, p) => c + 
-          ContextVarConstraint(t->inContextVar, p.name, p.actual) +
-          SubtypeConstraint(p.actual, p.in)
+          ContextVarConstraint(t->inContextVar, p.name, p.actual)
         )
       )
 
     val contextChangedVars =
       (paramTypeVars.foldLeft
         (Map.empty[String,TypeExpr])
-        ((m,p) => m + (p.name -> p.out)))
+        ((m,p) => m + (p.name -> RemapTE(p.actual, p.in >> p.out))))
 
     (paramConstraints ++
       (ConstraintSet() +
@@ -277,23 +262,31 @@ object ConstraintGenerator {
   def methCallConstraint(t : MethCall) = {
     val objectVar = (t->tvGen).next()
     val inStateVar = (t->tvGen).next()
-    val outStateVar = (t->tvGen).next()
     val inObjectType = ObjectTE(objectVar, inStateVar)
+
+    val s1var = (t->tvGen).next
+    val s2var = (t->tvGen).next
+
+    val graph = Graph(State("S1") ~> State("S2") by Method(t.methName, VarTE(t->typeVar)))
+    val beforeCall = SolvedObjectTE(graph, Set("S1"))
+    val afterCall = beforeCall.copy(states = Set("S2"))
+
+    val outStateVar = (t->tvGen).next()
     val outObjectType = ObjectTE(objectVar, outStateVar)
-    val methType = VarTE(t->typeVar)
+
     (ConstraintSet() +
       ContextVarConstraint(t->inContextVar, t.objVarName, inObjectType) +
-      MethodConstraint(objectVar, inStateVar, t.methName, 
-        methType, outStateVar) +
       ContextConstraint(t->outContextVar, 
-        ModifiedContext(t->inContextVar, Map(t.objVarName -> outObjectType)))
+        ModifiedContext(t->inContextVar, Map(t.objVarName -> outObjectType))) +
+      EqualityConstraint(outObjectType, 
+        RemapTE(inObjectType, beforeCall >> afterCall))
     )
   }
 
   def ifConstraints(t : If) =
     (ConstraintSet() +
       EqualityConstraint(VarTE(t.condition->typeVar), BoolTE) +
-      JoinConstraint(VarTE(t->typeVar), VarTE(t.whenTrue->typeVar), VarTE(t.whenFalse->typeVar)) +
+      EqualityConstraint(VarTE(t->typeVar), JoinTE(VarTE(t.whenTrue->typeVar), VarTE(t.whenFalse->typeVar))) +
       ContextConstraint(t.condition->inContextVar, sameAs(t->inContextVar)) +
       ContextConstraint(t.whenTrue->inContextVar, sameAs(t.condition->outContextVar)) +
       ContextConstraint(t.whenFalse->inContextVar, sameAs(t.condition->outContextVar)) +
@@ -305,7 +298,6 @@ object ConstraintGenerator {
 
   val paramToTypeExpr = 
     (pdef : ParamDef) => Pair(pdef.name, VarTE((pdef->tvGen).next()))
-
 
   def printInferenceTree(t : Term, indent : Int = 0) {
     val indentStr = "  " * indent

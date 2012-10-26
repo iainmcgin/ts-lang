@@ -78,36 +78,29 @@ class ConstraintSolver(t : Term) {
   def solvePolymorphic(constraints : ConstraintSet)
     : Option[Tuple4[PolyContext,Set[TypeVar],TypeExpr,PolyContext]] = {
 
-
     val (contexts, eqConstraints, subConstraints) = 
       reduceToTypeConstraints(constraints)
-
-    val stubbedJoins = constraints.jcs.flatMap(jc => 
-      Seq(EqualityConstraint(jc.a, jc.left), 
-        EqualityConstraint(jc.a, jc.right)))
     
     solveTypeConstraints(contexts, 
-      eqConstraints ++ stubbedJoins, 
-      subConstraints,
-      constraints.mcs)
+      eqConstraints, 
+      subConstraints)
   }
 
   def reduceToTypeConstraints(constraints : ConstraintSet)
     : (Map[ContextVar,PolyContext], Seq[EqualityConstraint], Seq[SubtypeConstraint]) = {
 
-    val (contexts, extraScs) = expandContexts(constraints.ccs, constraints.cvcs)
+    val (contexts, extraEcs) = expandContexts(constraints.ccs, constraints.cvcs)
     val extraTypeConstraints = matchTypes(contexts, constraints.cvcs)
 
     (contexts, 
-      constraints.tecs ++ extraTypeConstraints, 
-      constraints.scs ++ extraScs)
+      constraints.tecs ++ extraTypeConstraints ++ extraEcs, 
+      constraints.scs)
   }
 
   def solveTypeConstraints(
     contexts : Map[ContextVar, PolyContext],
     equalityConstraints : Seq[EqualityConstraint],
-    subtypeConstraints : Seq[SubtypeConstraint],
-    methodConstraints : Seq[MethodConstraint]) :
+    subtypeConstraints : Seq[SubtypeConstraint]) :
     Option[Tuple4[PolyContext,Set[TypeVar],TypeExpr,PolyContext]] = {
 
     // XXX: for now, treat all subtype constraints as equality, until a closure
@@ -118,12 +111,19 @@ class ConstraintSolver(t : Term) {
 
     val allTypeConstraints = equalityConstraints ++ stubbedScsConstraints
 
-    val varsToTypeExprsOpt = unifyTypes(allTypeConstraints)
     
+    val varsToTypeExprsOpt = unifyTypes(allTypeConstraints)
+    varsToTypeExprsOpt.foreach(varsToTypeExprs => {
+      log.debug("type constraints solution:\n\t" + varsToTypeExprs.mkString("\n\t"))
+    })
+
+    None
+    /*
     varsToTypeExprsOpt.map(varsToTypeExprs => {
       log.debug("type constraints solution:\n\t" + varsToTypeExprs.mkString("\n\t"))
-      val objects = solveMethodConstraints(methodConstraints, varsToTypeExprs)
-      log.debug("inferred object types:\n\t" + objects.mkString("\n\t"))
+
+
+
       val contextConverter = ((cv : ContextVar) =>
         contexts(cv).mapValues(te => 
           eliminateVariables(te, varsToTypeExprs, objects)._2)
@@ -139,6 +139,7 @@ class ConstraintSolver(t : Term) {
 
       new Tuple4(inCtx, free, termTe, outCtx)
     })
+    */
   }
 
   case class SolvedContext(contents : PolyContext, free : Boolean)
@@ -146,7 +147,7 @@ class ConstraintSolver(t : Term) {
   def expandContexts(
     ccs : Seq[ContextConstraint], 
     cvcs : Seq[ContextVarConstraint]) 
-    : (Map[ContextVar,PolyContext],Seq[SubtypeConstraint]) = {
+    : (Map[ContextVar,PolyContext],Seq[EqualityConstraint]) = {
 
     val ccById = 
       (ccs.foldLeft
@@ -167,18 +168,18 @@ class ConstraintSolver(t : Term) {
 
     var contexts = Map.empty[ContextVar, SolvedContext]
     var transRoots = Map.empty[ContextVar, ContextVar]
-    var extraScs = Seq.empty[SubtypeConstraint]
+    var extraEcs = Seq.empty[EqualityConstraint]
 
     val contextSortOpt = topologicalSort(dependencyGraph)
     if(contextSortOpt.isEmpty) throw new CyclicDependency(dependencyGraph)
     val contextSort = contextSortOpt.get
     contextSort.foreach(next => {
-      var (contextsUpdated, transRootsUpdated, subtypeConstraints) = 
+      var (contextsUpdated, transRootsUpdated, equalityConstraints) = 
         solveCtxConstraint(ccById(next), contexts, transRoots)
 
       contexts = contextsUpdated
       transRoots = transRootsUpdated
-      extraScs = extraScs ++ subtypeConstraints
+      extraEcs = extraEcs ++ equalityConstraints
 
       val localCvcs = cvcsByContext.getOrElse(next, Seq.empty)
       contexts =
@@ -188,7 +189,7 @@ class ConstraintSolver(t : Term) {
         )
     })
 
-    (contexts.mapValues(sc => sc.contents), extraScs)
+    (contexts.mapValues(sc => sc.contents), extraEcs)
   }
 
   def buildDependencyGraph(constraints : Seq[ContextConstraint]) 
@@ -247,7 +248,7 @@ class ConstraintSolver(t : Term) {
     transRoots : Map[ContextVar, ContextVar]) 
     : (Map[ContextVar, SolvedContext], 
        Map[ContextVar, ContextVar],
-       Seq[SubtypeConstraint]) = {
+       Seq[EqualityConstraint]) = {
 
     cc.definedAs match {
       case BaseContext(contents, free) => {
@@ -270,12 +271,12 @@ class ConstraintSolver(t : Term) {
           case (Some(left), Some(right)) => {
             joinPolyContexts(left.contents, right.contents, t->tvGen).
               map(res => {
-                val (ctx, scs) = res
+                val (ctx, ecs) = res
                 val contexts2 = contexts + 
                   (cc.context -> SolvedContext(ctx, false))
                 val transRoots2 = transRoots + 
                   (cc.context -> transRoots(cj.left))
-                (contexts2, transRoots2, scs)
+                (contexts2, transRoots2, ecs)
               }).
               getOrElse(throw new CannotJoinContexts(cj))
           }
@@ -451,58 +452,7 @@ class ConstraintSolver(t : Term) {
     }
   }
 
-  def solveMethodConstraints(
-    methodConstraints : Seq[MethodConstraint],
-    varsToTypeExprs : Map[TypeVar, TypeExpr]) : Map[TypeVar,Seq[StateTE]] = {
-
-    
-    // 3.1 if any orphaned states exist, we do not have a complete object model?
-
-    log.debug("method constraints: " + methodConstraints)
-    // transform method constraints to use canonical variables
-    // for all objects and states described
-    val updatedConstraints = methodConstraints.map(c =>
-      c.copy(objVar = toCanonicalVar(c.objVar, varsToTypeExprs),
-        stateVar = toCanonicalVar(c.stateVar, varsToTypeExprs),
-        nextState = toCanonicalVar(c.nextState, varsToTypeExprs)))
-
-    // TODO: is it necessary to drill into the TypeExpr structure to find
-    // embedded ObjectTE instances too?
-    val knownObjectStates = 
-      extractStatesFromConstraints(
-        extractStatesFromVarMap(varsToTypeExprs),
-        updatedConstraints)
-
-    log.debug("knownObjectStates = " + knownObjectStates)
-
-    // populate states with methods
-    val statesWithMethods = 
-      (updatedConstraints.foldLeft
-        (knownObjectStates)
-        ((m, c) => {
-          val method = MethodTE(c.method, c.retType, c.nextState)
-          log.debug("processing " + method)
-          val obj = m.get(c.objVar).getOrElse(Map.empty[TypeVar, StateTE])
-          val state = obj.getOrElse(c.stateVar, StateTE(c.stateVar))
-          // TODO: check if method already exists, if so, further
-          // constraint solving may be necessary?
-          val updatedState = state.copy(methods = method +: state.methods)
-          m + (c.objVar -> (obj + (c.stateVar -> updatedState)))
-        })
-      ).mapValues(stateMap => Seq.empty ++ stateMap.values)
-
-    // finally, eliminate variables used for method return types
-    // TODO: any risk of cycles here that we need to worry about?
-    statesWithMethods.mapValues(states => {
-      states.map(state => {
-        state.copy(methods = state.methods.map(m => {
-          m.copy(ret = 
-            eliminateVariables(m.ret, varsToTypeExprs, statesWithMethods)._2)
-        }))
-      })
-    })
-  }
-
+  /*
   def extractStatesFromVarMap(varsToTypeExprs : Map[TypeVar, TypeExpr])
     : Map[TypeVar, Map[TypeVar, StateTE]] =
     (varsToTypeExprs.foldLeft
@@ -516,6 +466,7 @@ class ConstraintSolver(t : Term) {
         })
       )
 
+  
   def extractStatesFromConstraints(
     stateMap : Map[TypeVar, Map[TypeVar, StateTE]],
     constraints : Seq[MethodConstraint])
@@ -605,7 +556,7 @@ class ConstraintSolver(t : Term) {
         val canonicalObjectVar = toCanonicalVar(objVar, typeVarMap)
         objects.get(canonicalObjectVar) match {
           case Some(states) => 
-            (Set.empty, SolvedObjectTE(canonicalObjectVar, states, canonicalStateVar))
+            (Set.empty, SolvedObjectTE(states, canonicalStateVar))
           case None => 
             throw new IllegalArgumentException("unknown object " + objVar)
         }
@@ -617,6 +568,7 @@ class ConstraintSolver(t : Term) {
       }
     }
   }
+  */
 
     def makeTypeExplicit(
       te : TypeExpr,
@@ -635,15 +587,18 @@ class ConstraintSolver(t : Term) {
             ), 
             makeTypeExplicit(ret, substitution)
           )
-        case SolvedObjectTE(objVar, states, state) => 
-          ObjType(states.map(makeStateExplicit(_, substitution)), 
-            typeVarToName(state))
+        case SolvedObjectTE(graph, states) => 
+          // TODO
+          ObjType(Seq(StateSpec("S1", Seq.empty)), "S1")
+          //ObjType(states.map(makeStateExplicit(_, substitution)), 
+          //  typeVarToName(state))
         case o : ObjectTE => {
           log.error("unsolved ObjectTE: " + o)
           throw new IllegalArgumentException("unsolved: " + o)
         }
       }
 
+    /*
     def makeStateExplicit(
       st : StateTE,
       substitution : TypeVar => Type) : StateSpec = {
@@ -657,6 +612,7 @@ class ConstraintSolver(t : Term) {
 
       StateSpec(typeVarToName(st.nameVar), methods)
     }
+    */
 
     def typeVarToName(tv : TypeVar) = "S" + tv.v
 

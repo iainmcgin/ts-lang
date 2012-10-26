@@ -11,6 +11,10 @@
 
 package uk.ac.gla.dcs.ts.sm
 
+import uk.ac.gla.dcs.ts.TypeExpr
+import uk.ac.gla.dcs.ts.VarTE
+import uk.ac.gla.dcs.ts.TypeVar
+
 import scala.math.max
 
 import scala.collection.{Set => CSet}
@@ -39,7 +43,6 @@ class StateMachine(
   stateGenOpt : Option[StateGenerator] = None) {
 
   /** commonly used type aliases */
-  private type StatePair = Pair[State, State]
   type SMNode = StateGraph#NodeT
   type SMEdge = StateGraph#EdgeT
   type EdgePair = Pair[SMEdge, SMEdge]
@@ -301,7 +304,7 @@ class StateMachine(
 
     var equivPairs = Set.empty[StatePair]
     var overlaidGraph = g1
-    graphVisit2(s1, s2)(statePair => {
+    StateGraphUtils.visit2(s1, s2)(statePair => {
       val (left, right) = statePair
       equivPairs += statePair
 
@@ -377,75 +380,21 @@ class StateMachine(
     if(this.exitSet.size != other.exitSet.size)
       return Some("state machines have exit sets of different sizes")
 
-    var equivStates = Map.empty[(Boolean, State), State]
-    var leftNotVisited = this.graph.nodes.toNodeInSet
-    var rightNotVisited = other.graph.nodes.toNodeInSet
+    val equivResult = StateGraphUtils.findInconsistency(
+      this.graph, this.entry,
+      other.graph, other.entry)
 
-    def areEquivalent(a : State, b : State) : Option[Boolean] = (
-      equivStates get((true, a)) map (_ == b) 
-      orElse 
-      (equivStates get (false, b) map (_ == a))
-    )
-
-    def addEquivalence(a : State, b : State) = {
-      equivStates += (true, a) -> b
-      equivStates += (false, b) -> a
-    }
-
-    def checkEdges(a : State, b : State) : Either[String, Set[StatePair]] = {
-      val aEdges = ((this.graph get a outgoing) toSeq) sortBy (_.m.name)
-      val bEdges = ((other.graph get b outgoing) toSeq) sortBy (_.m.name)
-
-      if(aEdges.size != bEdges.size)
-        return Left("States " + a + " and " + b + 
-          ", which should be equivalent, have differing edge sets: " +
-          aEdges + " vs " + bEdges)
-
-      val zipEdges = aEdges zip bEdges
-
-      (zipEdges.foldLeft
-        (Right(Set.empty) : Either[String, Set[StatePair]])
-        ((r, p) => {
-          r.right flatMap (successors => {
-            val (aEdge, bEdge) = p
-            val successor : StatePair = (aEdge.to.value, bEdge.to.value)
-            if(aEdge.m != bEdge.m)
-              Left("States " + a + " and " + b + 
-                ", which should be equivalent, have differing edge sets: " + 
-                aEdges + " vs " + bEdges)
-            else Right(successors + Pair(aEdge.to.value, bEdge.to.value))
-          })
+    equivResult match {
+      case Left(mismatch) => Some(mismatch)
+      case Right(stateEquiv) => {
+        val exitSetEquiv = this.exitSet.forall(exit => {
+          val equivOpt = stateEquiv.getRightEquivalent(exit)
+          equivOpt.map(other.exitSet contains _).getOrElse(false)
         })
-      )
+
+        if(!exitSetEquiv) Some("Exit sets are not equivalent") else None
+      }
     }
-
-    val noSuccessors = Right(Set.empty[StatePair])
-
-    val mismatch = visit2(other)((statePair) => {
-      val (aSource, bSource) = (statePair._1, statePair._2)
-      leftNotVisited -= aSource
-      rightNotVisited -= bSource
-      (areEquivalent(aSource, bSource) map 
-        (if (_) noSuccessors
-         else Left("States " + aSource + " and " + bSource + 
-                   " are not equivalent"))
-        getOrElse {
-          addEquivalence(aSource, bSource)
-          checkEdges(aSource, bSource)
-        }
-      )
-    })
-
-    if(mismatch.isDefined) 
-      return mismatch
-    if(!leftNotVisited.isEmpty) 
-      return Some("States " + leftNotVisited.mkString(", ") + " have no equivalent")
-    if(!rightNotVisited.isEmpty)
-      return Some("States " + rightNotVisited.mkString(", ") + " have no equivalent")
-    if(!(this.exitSet.forall(other.exitSet contains equivStates(true,_))))
-      return Some("Exit sets are not equivalent")
-    
-    return None
   }
 
   /**
@@ -460,34 +409,8 @@ class StateMachine(
   def visit2[X](other : StateMachine)
     (f : (StatePair) => Either[X, collection.Set[StatePair]])
     : Option[X] = 
-    graphVisit2(this.entry, other.entry)(f)
+    StateGraphUtils.visit2(this.entry, other.entry)(f)
 
-  def graphVisit2[X](
-    entry1 : State, 
-    entry2 : State)(
-    f : (StatePair) => Either[X, collection.Set[StatePair]])
-    : Option[X] = {
-
-    // find equivalent transitions, offer to f
-    var initialPair = (entry1, entry2)
-    var visited = Set.empty[StatePair]
-    var visitList = Set[StatePair](initialPair)
-
-    while(!visitList.isEmpty) {
-      val entry = visitList.head
-      visitList -= entry
-      visited += entry
-
-      f(entry) match {
-        case Left(x) => 
-          return Some(x)
-        case Right(successors) => 
-          visitList ++= successors filterNot (visited.contains(_))
-      }
-    }
-
-    None
-  }
 
   override def toString =
     "<" + graph.toString + 
@@ -518,7 +441,7 @@ object StateMachine {
     // states, and start the reverse traversal from there
     val exitJoinState = sg()
     val extraExitTransitions : Set[GraphParam[State,Transition]] = 
-      exitSet map (exit => exit ~> exitJoinState by Method("$$FAKE$$"))
+      exitSet map (exit => exit ~> exitJoinState by Method("$$FAKE$$", VarTE(TypeVar(0))))
     val graphExitJoined = g + exitJoinState ++ extraExitTransitions
 
     var unCoConnected = graphExitJoined.nodes
@@ -534,7 +457,7 @@ object StateMachine {
 }
 
 
-case class Method(name : String) {
+case class Method(name : String, retType : TypeExpr) {
 
   def join(other : Method) : Method = {
     if(other.name != this.name) throw new IllegalArgumentException()

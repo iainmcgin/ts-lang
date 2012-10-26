@@ -13,13 +13,17 @@ package uk.ac.gla.dcs
 
 package object ts {
 
-  case class TypeVar(v : Int) {
+  case class TypeVar(v : Int) extends Ordered[TypeVar] {
+    override def compare(other : TypeVar) = this.v.compare(other.v)
     override def toString = "α" + asSubscript(v)
   }
 
-  case class ContextVar(v : Int) {
+  case class ContextVar(v : Int) extends Ordered[ContextVar] {
+    override def compare(other : ContextVar) = this.v.compare(other.v)
     override def toString = "ɣ" + asSubscript(v)
   }
+
+  type StateNameEquiv = Relation[String,String]
 
   def asSubscript(num : Int) : String = 
     num.toString.map(c => (c - '0' + 0x2080).toChar)
@@ -68,7 +72,7 @@ package object ts {
   def joinPolyContexts(c1 : PolyContext, 
     c2 : PolyContext, 
     tvGen : TypeVarGenerator)
-    : Option[Pair[PolyContext, Seq[SubtypeConstraint]]] = {
+    : Option[Pair[PolyContext, Seq[EqualityConstraint]]] = {
     // TODO
     if(c1.keySet != c2.keySet) {
       return None
@@ -76,13 +80,11 @@ package object ts {
 
     Some(
       c1.foldLeft
-        (Pair(c1.empty, Seq.empty[SubtypeConstraint]))
+        (Pair(c1.empty, Seq.empty[EqualityConstraint]))
         ((res, p) => {
           var tv = VarTE(tvGen.next())
           (res._1 + (p._1 -> tv), 
-            SubtypeConstraint(p._2, tv) +:
-            SubtypeConstraint(c2(p._1), tv) +:
-            res._2
+            EqualityConstraint(tv, JoinTE(p._2, c2(p._1))) +: res._2
           )
         })
     )

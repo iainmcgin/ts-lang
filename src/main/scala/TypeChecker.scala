@@ -138,7 +138,9 @@ object TypeChecker {
   val input : Term => Context =
     childAttr {
       case t => {
-        case FunValue(params,body) => contextFromParams(params)
+        case FunValue(params,body) => 
+          // t must be the body of the function
+          contextFromParams(params)
         case p @ LetBind(name,value,body) => {
           if (t eq value) p->input
           else value->output + Pair(p.varName,p.value->ttype)
@@ -154,6 +156,10 @@ object TypeChecker {
           else cond->output
         }
         case p if p != null && p.isRoot => {
+          emptyContext
+        }
+        case null if t.isRoot => {
+          // the root term always has an empty context
           emptyContext
         }
         case p => {
