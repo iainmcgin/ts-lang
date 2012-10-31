@@ -241,18 +241,13 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
     }
 
     effectPathOpt.map({ case (graph, inStates, outStates) => {
-      // if the in state set has more than one state, compute the
-      // intersection of the states so there is just one input state
+
       val (intersectionGraph, intersectionInState, stateEquiv) = 
         StateGraphUtils.internalIntersection(graph, inStates)
 
-      // all of the original out states must have an equivalent in the 
-      // intersection graph, or the effect is invalid
       val intersectionOutStates = 
         outStates.flatMap(stateEquiv.findRightEquivsOrFail(_))
 
-      // TODO: trim the graph to just the paths from the input state to the
-      // output states
       val trimGraph = StateGraphUtils.trimToPath(intersectionGraph, 
         intersectionInState, 
         intersectionOutStates)
@@ -266,6 +261,25 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
     // respective paths. Clean way to split into pre / post sections
     // of each graph, perform union of post parts and direct pre to
     // union part?
+
+    val leftObjOpt = objects.getSolution(left.objVar)
+    val leftSolnOpt = 
+      leftObjOpt.map(o => (o, states.getSolution(left.stateVar)))
+
+    val rightObjOpt = objects.getSolution(right.objVar)
+    val rightSolnOpt = 
+      rightObjOpt.map(o => (o, states.getSolution(right.stateVar)))
+
+    val solnOpt = StateGraphUtils.connectOpt(leftSolnOpt, rightSolnOpt)
+
+    objects.makeEquivalent(left.objVar, right.objVar)
+    states.makeEquivalent(left.stateVar, right.stateVar)
+
+    solnOpt.map(soln => {
+      val (obj, statesOpt) = soln
+      objects.makeEquivalent(left.objVar, right.objVar, obj)
+      statesOpt.map(states.makeEquivalent(left.stateVar, right.stateVar, _))
+    })
   }
 
   def solveJoin(result : ObjectTE, left : ObjectTE, right : ObjectTE) {

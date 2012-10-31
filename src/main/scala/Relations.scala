@@ -65,6 +65,11 @@ class SetBasedRelation[T,U](private val relation : Set[(T,U)])
       throw new IllegalStateException("no unique equivalent")
     equivs.head
   }
+
+  override def toString = 
+    relation.
+    map(entry => entry._1 + " = " + entry._2).
+    mkString("Relation(", ", ", ")")
 }
 
 object Relation {

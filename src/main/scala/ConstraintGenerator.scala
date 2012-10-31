@@ -137,6 +137,7 @@ object ConstraintGenerator {
       case t : FunCall    => funCallConstraint(t)
       case t : MethCall   => methCallConstraint(t)
       case t : If         => ifConstraints(t)
+      case t : ErrorValue => throw new IllegalArgumentException()
     }
 
   def unitValueConstraints(t : UnitValue) =

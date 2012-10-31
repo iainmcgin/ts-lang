@@ -68,17 +68,18 @@ class StateMachine(
       throw new IllegalArgumentException(
         "exit states not in graph: " + missingExits)
 
-    val unconnected = StateMachine.findUnconnected(graph, entry)
+    val unconnected = StateGraphUtils.findUnconnected(graph, entry)
     if(unconnected.size > 0)
       throw new IllegalArgumentException(
         "no path exists from entry state " + entry + 
         " to states: " + unconnected.mkString("{ ", ", ", " }"))
 
-    val unCoConnected = StateMachine.findUnCoConnected(graph, exitSet, stateGen.copy())
+    val unCoConnected = StateGraphUtils.findUnCoConnected(graph, exitSet, stateGen.copy())
     if(unCoConnected.size > 0)
       throw new IllegalArgumentException(
-        "states {" + unCoConnected.mkString("{ ", ", ", " }") + 
-        "} have no path to an exit state " + exitSet)
+        "states " + unCoConnected.mkString("{ ", ", ", " }") + 
+        " have no path to an exit state " + exitSet.mkString("{ ", ", ", " }") +
+        " in graph " + graph)
   }
   checkInvariants()
   /******************* end of invariant checking code *************************/
@@ -270,8 +271,8 @@ class StateMachine(
 
     val sg = new StateGenerator(graph.nodes.toNodeInSet)
     val entryInner = graph get entry
-    var unconnected = StateMachine.findUnconnected(graph, entry)
-    val unCoConnected = StateMachine.findUnCoConnected(graph, exitSet, sg)
+    var unconnected = StateGraphUtils.findUnconnected(graph, entry)
+    val unCoConnected = StateGraphUtils.findUnCoConnected(graph, exitSet, sg)
 
     val trimmedGraph = graph -- unconnected -- unCoConnected
     val trimmedExitSet = exitSet -- unconnected.toNodeInSet
@@ -422,38 +423,6 @@ class StateMachine(
 object StateMachine {
   def apply(graph : StateGraph, entry : State, exitSet : Set[State]) =
     new StateMachine(graph, entry, exitSet, None)
-
-  private def findUnconnected(g : StateGraph, from : State) 
-    : StateGraph#NodeSetT = {
-
-    var unconnected = g.nodes
-    (g get from).traverse()(n => {
-      unconnected -= n
-      Continue
-    })
-    unconnected
-  }
-
-  private def findUnCoConnected(g : StateGraph, exitSet : Set[State], sg : StateGenerator) 
-    : StateGraph#NodeSetT = {
-
-    // create a new fake state that is connected to all the known exit
-    // states, and start the reverse traversal from there
-    val exitJoinState = sg()
-    val extraExitTransitions : Set[GraphParam[State,Transition]] = 
-      exitSet map (exit => exit ~> exitJoinState by Method("$$FAKE$$", VarTE(TypeVar(0))))
-    val graphExitJoined = g + exitJoinState ++ extraExitTransitions
-
-    var unCoConnected = graphExitJoined.nodes
-
-    (graphExitJoined get exitJoinState).
-      traverse(direction=Predecessors)(n => {
-        unCoConnected -= n
-        Continue
-      })
-
-    unCoConnected
-  }
 }
 
 
@@ -483,6 +452,10 @@ final class StateGenerator(
   private def gen() : String = {
     last += 1
     "S" + last
+  }
+
+  def replace(name : String) : String = {
+    if(exclusions contains name) next() else name
   }
 
   def next() : String = {
