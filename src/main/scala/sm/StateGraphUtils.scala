@@ -34,14 +34,19 @@ object StateGraphUtils {
       g : StateGraph,
       states : Set[State])
       : Set[StateGraph#NodeT] =
-    states map (state => {
-      if(!(g contains state)) {
+    states map (getInnerState(g, _))
+
+  def getInnerState(
+      g : StateGraph,
+      state : State) : StateGraph#NodeT = { 
+    if(!(g contains state)) {
         throw new IllegalArgumentException(
           "State " + state.name + " does not exist in " + g)
       }
 
-      g get state
-    })
+    g get state
+  }
+
 
   /**
    * Creates a graph which represents the intersection of the paths
@@ -85,7 +90,7 @@ object StateGraphUtils {
         
           val newReturnType = edgeSet.map(_.edge.m.retType).reduce(JoinTE(_, _))
           val targetSet = edgeSet.map(_.edge.to)
-          val newTarget = sg()
+          val newTarget = stateMapping.getOrElse(targetSet, sg())
           stateMapping += targetSet -> newTarget
 
           targetSet.foreach(s => stateEquiv += s.value.name -> newTarget.name)
@@ -115,8 +120,26 @@ object StateGraphUtils {
       g2start : String) 
       : (StateGraph, StateNameEquiv, StateNameEquiv) = {
 
-    // TODO
-    (g1, Relation.empty, Relation.empty)
+    val (combinedGraph, includeEquiv) = includeInto(g1, g2)
+    val g2startRelabeled = includeEquiv.findUniqueRightEquivOrFail(g2start)
+
+    val states = Set(g1start, g2startRelabeled)
+
+    val (intersectionGraph, _, intersectionEquiv) = 
+      internalIntersection(combinedGraph, states)
+
+    val g1Equiv = intersectionEquiv.subset(g1.nodes.map(_.value.name).toSet)
+
+    val g2statesRelabeled = 
+      g2.nodes.
+      map(n => includeEquiv.findUniqueRightEquivOrFail(n.value.name)).
+      toSet
+
+    val g2Equiv = 
+      intersectionEquiv.subset(g2statesRelabeled)
+
+
+    (intersectionGraph, g1Equiv, g2Equiv)
   }
 
   case class CannotOverlayException() extends Exception
@@ -238,7 +261,7 @@ object StateGraphUtils {
 
         val newReturnType = edgeSet.map(_.edge.m.retType).reduce(JoinTE(_, _))
         val targetSet = edgeSet.map(_.edge.to)
-        val newTarget = sg()
+        val newTarget = newStateMap.getOrElse(targetSet, sg())
         newStateMap += targetSet -> newTarget
 
         targetSet.foreach(s => stateEquiv += s.value.name -> newTarget.name)

@@ -18,6 +18,7 @@ trait Relation[T,U] {
   def findLeftEquivs(right : U) : Set[T]
   def findLeftEquivsOrFail(right : U) : Set[T]
   def findUniqueLeftEquivOrFail(right : U) : T
+  def subset(lefts : Set[T]) : Relation[T,U]
 }
 
 class IdentityRelation[T] extends Relation[T,T] {
@@ -27,6 +28,7 @@ class IdentityRelation[T] extends Relation[T,T] {
   override def findLeftEquivs(right : T) = Set(right)
   override def findLeftEquivsOrFail(right : T) = Set(right)
   override def findUniqueLeftEquivOrFail(right : T) = right
+  override def subset(lefts : Set[T]) = Relation(lefts.map(l => (l,l)))
 }
 
 class SetBasedRelation[T,U](private val relation : Set[(T,U)]) 
@@ -65,6 +67,9 @@ class SetBasedRelation[T,U](private val relation : Set[(T,U)])
       throw new IllegalStateException("no unique equivalent")
     equivs.head
   }
+
+  override def subset(lefts : Set[T]) = 
+    Relation(lefts.flatMap(l => relation.filter(_._1 == l)))
 
   override def toString = 
     relation.

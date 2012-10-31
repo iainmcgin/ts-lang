@@ -211,9 +211,6 @@ class StateGraphUtilsTest extends FunSuite with ShouldMatchers {
 
     val (actual, _, stateEquiv) = connect(g, Set(s("A"), s("B")))
 
-    println(actual)
-    println(stateEquiv)
-
     val aEquiv = stateEquiv.findUniqueRightEquivOrFail("A")
 
     val expected : StateGraph = Graph(
@@ -246,7 +243,7 @@ class StateGraphUtilsTest extends FunSuite with ShouldMatchers {
     (actual) should equal (expected)
   }
 
-  test("internalIntersection, no shared paths, no cycles") {
+  test("internalIntersection, no shared paths") {
     val g : StateGraph = Graph(
       s("A") ~> s("B") by m("a"),
       s("C") ~> s("D") by m("d")
@@ -283,18 +280,167 @@ class StateGraphUtilsTest extends FunSuite with ShouldMatchers {
     val bEquiv = equiv.findUniqueRightEquivOrFail("B")
     val dEquiv = equiv.findUniqueRightEquivOrFail("D")
 
+    (aEquiv) should equal (equiv.findUniqueRightEquivOrFail("E"))
+    (bEquiv) should equal (equiv.findUniqueRightEquivOrFail("F"))
+    (dEquiv) should equal (equiv.findUniqueRightEquivOrFail("G"))
+    (equiv.findRightEquivs("C")) should be ('empty)
+    (equiv.findRightEquivs("H")) should be ('empty)
+
     val expected : StateGraph = Graph(
       s(actualStart) ~> s(bEquiv) by m("a"),
       s(bEquiv) ~> s(dEquiv) by m("c")
     )
 
     (actual) should equal (expected)
+  }
 
-    (aEquiv) should equal (equiv.findUniqueRightEquivOrFail("E"))
-    (bEquiv) should equal (equiv.findUniqueRightEquivOrFail("F"))
-    (dEquiv) should equal (equiv.findUniqueRightEquivOrFail("G"))
-    (equiv.findRightEquivs("C")) should be ('empty)
-    (equiv.findRightEquivs("H")) should be ('empty)
+  test("internalIntersection, length 1 cycles") {
+    val g : StateGraph = Graph(
+      s("A") ~> s("A") by m("a"),
+      s("A") ~> s("B") by m("b"),
+      s("B") ~> s("B") by m("b"),
+
+      s("C") ~> s("C") by m("a"),
+      s("C") ~> s("D") by m("b"),
+      s("D") ~> s("E") by m("a"),
+      s("D") ~> s("F") by m("b")
+    )
+
+    val (actual, actualStart, equiv) = internalIntersection(g, Set("A", "C"))
+
+    println(actual)
+    println(equiv)
+
+    val aEquiv = equiv.findUniqueRightEquivOrFail("A")
+    (aEquiv) should equal (actualStart)
+    (aEquiv) should equal (equiv.findUniqueRightEquivOrFail("C"))
+
+    val bEquivs = equiv.findRightEquivsOrFail("B")
+    (bEquivs) should have size (2)
+
+    val dEquiv = equiv.findUniqueRightEquivOrFail("D")
+    (bEquivs) should contain (dEquiv)
+    val fEquiv = equiv.findUniqueRightEquivOrFail("F")
+    (bEquivs) should contain (fEquiv)
+
+    (equiv.findRightEquivs("E")) should be ('empty)
+
+    val expected : StateGraph = Graph(
+      s(aEquiv) ~> s(aEquiv) by m("a"),
+      s(aEquiv) ~> s(dEquiv) by m("b"),
+      s(dEquiv) ~> s(fEquiv) by m("b")
+    )
+
+    (actual) should equal (expected)
+  }
+
+  def findIntersectionState(
+      equiv : StateNameEquiv, 
+      stateNames : String*) 
+      : String = {
+    val sharedEquivs = 
+      stateNames.
+      map(equiv.findRightEquivs(_)).
+      reduceOption(_ intersect _).
+      getOrElse(Set.empty)
+
+    if(sharedEquivs.size != 1)
+      fail("no unique intersection state for " + stateNames + ": " + sharedEquivs)
+    else
+      sharedEquivs.head
+  }
+
+  def findIntersectionState(
+      equiv1 : StateNameEquiv, 
+      s1 : String,
+      equiv2 : StateNameEquiv,
+      s2 : String) = {
+    val s1Equivs = equiv1.findRightEquivs(s1)
+    val s2Equivs = equiv2.findRightEquivs(s2)
+
+    val sharedEquivs = s1Equivs intersect s2Equivs
+
+    if(sharedEquivs.size != 1)
+      fail("no unique intersection state for " + s1 + " and " + s2 + ": " + sharedEquivs)
+    else
+      sharedEquivs.head
+  } 
+
+  test("internalIntersection, longer cycles") {
+    val g : StateGraph = Graph(
+      s("A") ~> s("B") by m("a"),
+      s("B") ~> s("A") by m("b"),
+      s("A") ~> s("C") by m("c"),
+      s("C") ~> s("C") by m("c"),
+      s("C") ~> s("A") by m("a"),
+
+      s("D") ~> s("D") by m("a"),
+      s("D") ~> s("E") by m("b"),
+      s("E") ~> s("E") by m("c"),
+      s("E") ~> s("F") by m("a"),
+      s("F") ~> s("D") by m("b")
+    )
+
+    val (actual, actualStart, equiv) = 
+      internalIntersection(g, Set("A", "D"))
+
+    val ad = findIntersectionState(equiv, "A", "D")
+    val bd = findIntersectionState(equiv, "B", "D")
+    val ae = findIntersectionState(equiv, "A", "E")
+    val ce = findIntersectionState(equiv, "C", "E")
+    val af = findIntersectionState(equiv, "A", "F")
+    val bf = findIntersectionState(equiv, "B", "F")
+    
+    val expected : StateGraph = Graph(
+      s(ad) ~> s(bd) by m("a"),
+      s(bd) ~> s(ae) by m("b"),
+      s(ae) ~> s(bf) by m("a"),
+      s(ae) ~> s(ce) by m("c"),
+      s(ce) ~> s(ce) by m("c"),
+      s(ce) ~> s(af) by m("a"),
+      s(bf) ~> s(ad) by m("b")
+    )
+
+    (actual) should equal (expected)
+  }
+
+  test("intersection") {
+    val g1 : StateGraph = Graph(
+      s("A") ~> s("B") by m("a"),
+      s("B") ~> s("A") by m("b"),
+      s("A") ~> s("C") by m("c"),
+      s("C") ~> s("C") by m("c"),
+      s("C") ~> s("A") by m("a")
+    )
+
+    val g2 : StateGraph = Graph(
+      s("D") ~> s("D") by m("a"),
+      s("D") ~> s("E") by m("b"),
+      s("E") ~> s("E") by m("c"),
+      s("E") ~> s("F") by m("a"),
+      s("F") ~> s("D") by m("b")
+    )
+
+    val (actual, g1Equiv, g2Equiv) = intersection(g1, "A", g2, "D")
+
+    val ad = findIntersectionState(g1Equiv, "A", g2Equiv, "D")
+    val bd = findIntersectionState(g1Equiv, "B", g2Equiv, "D")
+    val ae = findIntersectionState(g1Equiv, "A", g2Equiv, "E")
+    val ce = findIntersectionState(g1Equiv, "C", g2Equiv, "E")
+    val af = findIntersectionState(g1Equiv, "A", g2Equiv, "F")
+    val bf = findIntersectionState(g1Equiv, "B", g2Equiv, "F")
+    
+    val expected : StateGraph = Graph(
+      s(ad) ~> s(bd) by m("a"),
+      s(bd) ~> s(ae) by m("b"),
+      s(ae) ~> s(bf) by m("a"),
+      s(ae) ~> s(ce) by m("c"),
+      s(ce) ~> s(ce) by m("c"),
+      s(ce) ~> s(af) by m("a"),
+      s(bf) ~> s(ad) by m("b")
+    )
+
+    (actual) should equal (expected)
   }
 
 }
