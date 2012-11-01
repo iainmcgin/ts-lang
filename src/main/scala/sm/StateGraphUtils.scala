@@ -60,6 +60,10 @@ object StateGraphUtils {
       : (StateGraph, String, StateNameEquiv) = {
 
     if(states.isEmpty) throw new IllegalArgumentException()
+    if(states.size == 1) {
+      val equiv = Relation(g.nodes.map(n => (n.value.name, n.value.name)).toSet)
+      return (g, states.head, equiv)
+    }
 
     val sg = new StateGenerator()
 
@@ -129,15 +133,7 @@ object StateGraphUtils {
       internalIntersection(combinedGraph, states)
 
     val g1Equiv = intersectionEquiv.subset(g1.nodes.map(_.value.name).toSet)
-
-    val g2statesRelabeled = 
-      g2.nodes.
-      map(n => includeEquiv.findUniqueRightEquivOrFail(n.value.name)).
-      toSet
-
-    val g2Equiv = 
-      intersectionEquiv.subset(g2statesRelabeled)
-
+    val g2Equiv = includeEquiv.compose(intersectionEquiv)
 
     (intersectionGraph, g1Equiv, g2Equiv)
   }
@@ -163,10 +159,67 @@ object StateGraphUtils {
       overlayStates : Set[String], 
       g2 : StateGraph, 
       g2start : String)
-      : (StateGraph, StateNameEquiv, StateNameEquiv) = {
+      : (StateGraph, StateNameEquiv) = {
 
-    // TODO
-    (g1, Relation.empty, Relation.empty)
+    (overlayStates.foldLeft
+      ((g1, Relation.empty[String,String]))
+      { case ((g, g2Equiv), state) => {
+        val (overlayGraph, overlayEquiv) = overlay(g, state, g2, g2start)
+        (overlayGraph, g2Equiv union overlayEquiv)
+      }}
+    )
+
+  }
+
+  def overlay(
+      g1 : StateGraph,
+      g1start : String,
+      g2 : StateGraph,
+      g2start : String)
+      : (StateGraph, StateNameEquiv) = {
+
+    val (combinedGraph, g2RelabeledEquiv) = includeInto(g1, g2)
+
+    val sg = new StateGenerator(g1.nodes.toNodeInSet)
+
+    val g1startInner =
+      combinedGraph get State(g1start)
+
+    val g2startRelabeled = g2RelabeledEquiv.findUniqueRightEquivOrFail(g2start)
+    val g2startInner = 
+      combinedGraph get State(g2startRelabeled)
+
+    var startSet : Set[StateGraph#NodeT] = Set(g1startInner, g2startInner)
+    var stateMap : Map[Set[_ <: StateGraph#NodeT], State] = 
+      Map(startSet -> g1startInner.value)
+
+    var g2OverlayEquiv = Set.empty[(String, String)]
+    var overlayGraph = combinedGraph
+
+    visit(startSet)(stateSet => {
+      val partition = partitionEdges(stateSet)
+
+      partition.disjoint.foreach(e => 
+        overlayGraph += stateMap(stateSet).value ~> e.edge.to.value by e.edge.m)
+
+      val visitList = (partition.shared map { case (methodName, edgeSet) => {
+
+        val targetSet = edgeSet.map(_.edge.to)
+        val g1target = targetSet.find(g1 contains _.value).get
+        val g2target = (targetSet - g1target).head
+        stateMap += targetSet -> g1target.value
+
+        g2OverlayEquiv += g2target.value.name -> g1target.value.name
+
+        targetSet
+      }}).toSet
+
+      Right(visitList)
+    })
+
+    val g2Equiv = g2RelabeledEquiv.compose(Relation(g2OverlayEquiv))
+
+    (overlayGraph, g2Equiv)
   }
 
   case class CannotConnectException() extends Exception
@@ -401,6 +454,11 @@ object StateGraphUtils {
       g2 : StateGraph) 
       : (StateGraph, StateNameEquiv) = {
 
+    if(g1 == g2) {
+      val equiv = Relation(g1.nodes.toNodeInSet.map(s => (s.name, s.name)).toSet)
+      return (g1, equiv)
+    }
+
     val stateGen = new StateGenerator(g1.nodes.toNodeInSet)
     val relabelRelation = Relation(g2.nodes.map(n => {
       val name = n.value.name
@@ -425,6 +483,13 @@ object StateGraphUtils {
     (g4, relabelRelation)
   }
 
+  def alphaEquivalent(
+      g1 : StateGraph, 
+      g1start : State, 
+      g2 : StateGraph, 
+      g2start : State) : Boolean =
+    findInconsistency(g1, g1start, g2, g2start).isRight
+
   /**
    * Inspects the two provided graphs for alpha equivalence, using the
    * provided states as a starting point. If the graphs are alpha equivalent,
@@ -439,8 +504,11 @@ object StateGraphUtils {
       varEquiv : Equivalence[TypeVar,TypeVar] = new Equivalence(Map.empty)) 
       : Either[String,Equivalence[State,State]] = {
 
-    if(!(g1 contains g1start) || !(g2 contains g2start))
-      throw new IllegalArgumentException()
+    if(!(g1 contains g1start))
+      throw new IllegalArgumentException("state " + g1start + " not found in graph " + g1)
+
+    if(!(g2 contains g2start))
+      throw new IllegalArgumentException("state " + g2start + " not found in graph " + g2)
 
     val stateEquiv = new Equivalence(Map.empty[State,State])
 

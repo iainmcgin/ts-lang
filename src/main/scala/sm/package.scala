@@ -11,13 +11,13 @@
 
 package uk.ac.gla.dcs.ts
 
+import scalax.collection.Graph
+import scalax.collection.GraphPredef._
+import scalax.collection.GraphEdge._
+
+import scalax.collection.edge.LDiEdge
+
 package object sm {
-
-  import scalax.collection.Graph
-  import scalax.collection.GraphPredef._
-  import scalax.collection.GraphEdge._
-
-  import scalax.collection.edge.LDiEdge
 
   implicit def edge2TransitionAssoc[S <: State](e : DiEdge[State]) =
     new TransitionAssoc(e)

@@ -308,9 +308,6 @@ class StateGraphUtilsTest extends FunSuite with ShouldMatchers {
 
     val (actual, actualStart, equiv) = internalIntersection(g, Set("A", "C"))
 
-    println(actual)
-    println(equiv)
-
     val aEquiv = equiv.findUniqueRightEquivOrFail("A")
     (aEquiv) should equal (actualStart)
     (aEquiv) should equal (equiv.findUniqueRightEquivOrFail("C"))
@@ -402,6 +399,18 @@ class StateGraphUtilsTest extends FunSuite with ShouldMatchers {
     )
 
     (actual) should equal (expected)
+  }
+
+  test("internalIntersection with single state") {
+    val g1 : StateGraph = Graph(
+      s("A") ~> s("B") by m("a"),
+      s("B") ~> s("A") by m("b")
+    )
+
+    val (actual, actualStart, equiv) = internalIntersection(g1, Set("A"))
+
+    (actualStart) should equal ("A")
+    (actual) should equal (g1)
   }
 
   test("intersection") {

@@ -144,11 +144,16 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
     param : ObjectTE, 
     effect : EffectTE) {
 
+    println(result + " = remap(" + param + ", " + effect + ")")
+
     val (paramGraph, paramStates, afterEffectStates) = 
       refineParamSolutionWithEffect(param, effect)
 
     val existingResultGraphOpt = objects.getSolution(result.objVar)
     val existingResultStatesOpt = states.getSolution(result.stateVar)
+
+    println("param solution: " + paramGraph + "@" + paramStates + " >> " + afterEffectStates)
+    println("existing result: " + existingResultGraphOpt + "@" + existingResultStatesOpt)
 
     val paramAfterEffectSolution = Some(paramGraph, Some(afterEffectStates))
     val existingResultSolution = 
@@ -162,6 +167,10 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
 
     val resultStates = resultStatesOpt.get
 
+    println("final param/result graph: " + connectedGraph)
+    println("final param states: " + paramStates)
+    println("final result states: " + resultStates)
+
     objects.makeEquivalent(param.objVar, result.objVar, connectedGraph)
     states.updateSolution(param.stateVar, paramStates)
     states.updateSolution(result.stateVar, resultStates)
@@ -170,43 +179,57 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
   def refineParamSolutionWithEffect(param : ObjectTE, effect : EffectTE) 
       : (StateGraph, Set[String], Set[String]) = {
 
+    println("refining " + param + " with " + effect)
+
     val (effectGraph, effectInState, effectOutStates) = 
       normaliseEffect(effect).getOrElse { throw new IllegalStateException() }
     
+    println("effect is " + effectGraph + "@" + effectInState + " >> " + effectOutStates)
+
     val paramObjectGraphOpt = objects.getSolution(param.objVar)
     val paramStatesOpt = states.getSolution(param.stateVar)
 
-    paramObjectGraphOpt.map(graph => {
-      paramStatesOpt.map(states => {
-        // both param graph and param state set have solutions, so
-        // overlay the effect into the param graph, and use this combined 
-        // graph to determine the output state set
-        val (newGraph, _, effectStateEquiv) = 
-          StateGraphUtils.overlay(graph, states, effectGraph, effectInState)
+    val (paramGraph, paramStates, paramAfterEffectStates) = 
+      paramObjectGraphOpt.map(graph => {
+        paramStatesOpt.map(states => {
+          // both param graph and param state set have solutions, so
+          // overlay the effect into the param graph, and use this combined 
+          // graph to determine the output state set
 
-        val outStates = 
-          effectOutStates.flatMap(effectStateEquiv.findRightEquivs(_))
+          println("existing solution for param: " + graph + "@" + states)
+          val (newGraph, effectStateEquiv) = 
+            StateGraphUtils.overlay(graph, states, effectGraph, effectInState)
 
-        (newGraph, states, outStates)
+          val outStates = 
+            effectOutStates.flatMap(effectStateEquiv.findRightEquivs(_))
+
+          (newGraph, states, outStates)
+        }) getOrElse {
+          // the param graph is known, but the input state is not, so
+          // copy the effect graph directly into the param graph, using
+          // the effect input state as the solution for the param state set
+          println("graph exists for param: " + graph)
+          val (newGraph, effectStateEquiv) = 
+            StateGraphUtils.includeInto(graph, effectGraph)
+          val inState = 
+            effectStateEquiv.findUniqueRightEquivOrFail(effectInState)
+          val outStates = 
+            effectOutStates.map(effectStateEquiv.findUniqueRightEquivOrFail(_))
+
+          (newGraph, Set(inState), outStates)
+        }
       }) getOrElse {
-        // the param graph is known, but the input state is not, so
-        // copy the effect graph directly into the param graph, using
-        // the effect input state as the solution for the param state set
-        val (newGraph, effectStateEquiv) = 
-          StateGraphUtils.includeInto(graph, effectGraph)
-        val inState = 
-          effectStateEquiv.findUniqueRightEquivOrFail(effectInState)
-        val outStates = 
-          effectOutStates.map(effectStateEquiv.findUniqueRightEquivOrFail(_))
-
-        (newGraph, Set(inState), outStates)
+        // nothing is known of the param graph
+        // use the effect graph as the solution for the param graph and
+        // the state set
+        println("nothing known of param")
+        (effectGraph, Set(effectInState), effectOutStates)
       }
-    }) getOrElse {
-      // nothing is known of the param graph
-      // use the effect graph as the solution for the param graph and
-      // the state set
-      (effectGraph, Set(effectInState), effectOutStates)
-    }
+
+    objects.updateSolution(param.objVar, paramGraph)
+    states.updateSolution(param.stateVar, paramStates)
+
+    (paramGraph, paramStates, paramAfterEffectStates)
   }
   
   /**
@@ -279,6 +302,7 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
       val (obj, statesOpt) = soln
       objects.makeEquivalent(left.objVar, right.objVar, obj)
       statesOpt.map(states.makeEquivalent(left.stateVar, right.stateVar, _))
+      println("equality solution: " + obj + "@" + statesOpt)
     })
   }
 

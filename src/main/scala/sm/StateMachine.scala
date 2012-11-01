@@ -125,44 +125,27 @@ class StateMachine(
   def intersection(other : StateMachine, label : String = "") : StateMachine = {
     if(this eq other) return this
 
-    val sg = new StateGenerator()
-    val initialPair = (this.entry, other.entry)
-    val initialState = sg()
-    var stateMapping = Map(initialPair -> initialState)
-    var intersectionGraph : StateGraph = Graph(initialState)
+    val (intersectionGraph, thisEquiv, otherEquiv) = 
+      StateGraphUtils.intersection(
+        this.graph, this.entry.name, 
+        other.graph, other.entry.name)
 
-    visit2(other)((statePair) => {
-      val (aSource, bSource) = statePair
-      val source = stateMapping((aSource, bSource))
-      val aEdges = (this.graph get aSource outgoing)
-      val bEdges = (other.graph get bSource outgoing)
+    val intersectionEquiv = thisEquiv.rightIntersection(otherEquiv)
 
-      val successors = aEdges flatMap (aEdge => {
-        bEdges find (_.m == aEdge.m) map (bEdge => {
-          val targetPair = (aEdge.to.value, bEdge.to.value)
-          val target = stateMapping.getOrElse(targetPair, sg())
-          stateMapping = stateMapping.updated(targetPair, target)
-          intersectionGraph += (source ~> target by aEdge.m)
+    val intersectionEntry = 
+      State(intersectionEquiv.findUniqueRightEquivOrFail(
+        (this.entry.name, other.entry.name)))
 
-          Seq(targetPair)
-        }) getOrElse (Seq.empty[StatePair])
-      })
+    val exitPairs = this.exitSet.flatMap(e => 
+      other.exitSet.map(e2 => (e.name,e2.name)))
 
-      Right(successors)
-    })
+    val intersectionExitSet = exitPairs.flatMap(p =>
+      intersectionEquiv.findRightEquivs(p).map(State(_)))
 
-    val exitMap = stateMapping filter (mapping => {
-      val (statePair, _) = mapping
-      val (left, right) = statePair
-      (this.exitSet contains left) && (other.exitSet contains right)
-    })
+    val (trimmedGraph, trimmedExitSet) =
+      trim(intersectionGraph, intersectionEntry, intersectionExitSet)
 
-    val exitSet = Set(exitMap.values toSeq :_*)
-
-    val (trimmedGraph, trimmedExitSet) = 
-      trim(intersectionGraph, initialState, exitSet)
-
-    StateMachine(trimmedGraph, initialState, trimmedExitSet)
+    StateMachine(trimmedGraph, intersectionEntry, trimmedExitSet)
   }
 
   /**

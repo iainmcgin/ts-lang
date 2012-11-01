@@ -11,6 +11,12 @@
 
 package uk.ac.gla.dcs.ts
 
+import sm._
+
+import scalax.collection.GraphPredef._
+import scalax.collection.Graph
+import scalax.collection.GraphEdge._
+
 object TestUtils {
 
   /* parser utility */
@@ -54,6 +60,15 @@ object TestUtils {
   }
 
   implicit def strToUpdateHelper(str : String) = UpdateHelper(str)
+
+  /* state and method creation helpers */
+
+  def s(name : String) = State(name)
+  def m(name : String) = Method(name, UnitTE)
+  def m(name : String, typ : TypeExpr) = Method(name, UnitTE)
+
+  def methodGraph(m : Method) : (StateGraph, String, String) = 
+    (Graph(s("A") ~> s("B") by m), "A", "B")
 
 }
 
