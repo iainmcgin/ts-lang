@@ -184,12 +184,14 @@ ctxc {{ tex \mathcal{C} }} :: 'gc_' ::=
 
 tyc {{ tex \mathcal{T} }} :: 't_' ::=
 {{ com type expr. constraints }}
-  | ex </ ai // i /> . C      ::  :: ExTy
+  | ex </ ai // i /> . C          ::  :: ExTy
     {{ com type variable }}
-  | tinf = tinf'              ::  :: Equality
+  | tinf = tinf'                  ::  :: Equality
     {{ com equality  }}
-  | tinf = tinf' join tinf''  ::  :: Join
-    {{ com join }}
+  | tinf = tinf' join tinf''      ::  :: Join
+    {{ com join related }}
+  | tinf = tinf' joinplus tinf''  ::  :: JoinSep
+    {{ com join unrelated }}
 
 
 tinf {{ tex \mathbb{T} }} :: 'TInf_' ::=
@@ -206,13 +208,17 @@ tinf {{ tex \mathbb{T} }} :: 'TInf_' ::=
 
 
 oinf {{ tex \mathbb{O} }} :: 'OInf_' ::=
-  | partial { </ sinfi // i /> } @ SSet     ::  :: Inferred
-    {{ com inferred object }}
-  | known { </ sinfi // i /> } @ SSet       ::  :: Known
-    {{ com known object }}
+{{ com object expressions }}
+  | a @ a'                                  ::  :: ObjVar
+    {{ com typestate variable }}
+  | fixed { </ sinfi // i /> } @ SSet       ::  :: FixedObj
+    {{ com fully inferred }}
+  | partial { </ sinfi // i /> } @ SSet     ::  :: FreeObj
+    {{ com partially inferred }}
 
 sinf {{ tex \mathbb{S} }} :: 'SInf_' ::=
-  | S { </ mi : ai => ai' // i /> }           ::  :: State
+{{ com inferred states }}
+  | S { </ mi : ai => ai' // i /> }         ::  :: State
 
 %-----------------------------
 % TEX RULES FOR TERMINALS    -
@@ -248,6 +254,7 @@ terminals :: 'terminals_' ::=
   | unit         ::  :: unit       {{ tex \mathtt{unit} }}
   | true         ::  :: true       {{ tex \mathtt{true} }}
   | false        ::  :: false      {{ tex \mathtt{false} }}
+  | joinplus     ::  :: joinplus   {{ tex \sqcupplus }}
 
 %-------------------------------------------------------------------------------
 % OPERATIONAL SEMANTICS

@@ -18,6 +18,10 @@
 \usepackage{graphicx}
 \usepackage{mathtools}
 
+\DeclareSymbolFont{symbolsC}{U}{ntxsyc}{m}{n}
+\SetSymbolFont{symbolsC}{bold}{U}{ntxsyc}{b}{n}
+\DeclareMathSymbol{\sqcupplus}{\mathbin}{symbolsC}{124}
+
 \newtheorem{lem}{Lemma}
 \newtheorem{thm}{Theorem}
 \newtheorem{defn}{Definition}
@@ -373,7 +377,7 @@ $\mu[x \mapsto v]$, which is defined as follows:
 {\mu = \overline{x_i \mapsto v_i} & x \notin \overline{x_i}}
 &
 \infer
-{\mu[x \mapsto v] = \mu, x \mapsto v}
+{\mu[x \mapsto v] = \overline{x_i \mapsto v_i} , x \mapsto v}
 {\mu = \overline{x_i \mapsto v_i}, x \mapsto v'}
 \end{tabular}
 \]
@@ -384,7 +388,7 @@ no need for explicit ``location values'' as in the typical treatment of
 languages with references (such as in \cite{Pierce2002}). There is no need
 for a separate store typing, as a well-typed store can be defined directly
 in relation to a context as in \figref{fig:storetype}. A well-typed store
-may mappings for variables which are not in the context as shown in
+may contain mappings for variables which are not in the context as shown in
 rule \textsc{st\_extra}.
 
 \begin{figure}
@@ -422,12 +426,12 @@ relation.
 &
 \infer[\textsc{st\_vars}]
 {\overline{x_i : T_i} \vdash \overline{x_i \mapsto v_i}}
-{\typerule{\Gamma}{v_i}{T_i}{\Gamma'}}
+{\overline{\typerule{\Gamma}{v_i}{T_i}{\Gamma'}}}
 \\\\
 \multicolumn{2}{c}{
 \infer[\textsc{st\_extra}]
-{\Gamma \vdash \mu, \overline{y_j \mapsto v_j}}
-{\Gamma \vdash \mu & \overline{y_j \notin dom(\mu)}}
+{\Gamma \vdash \mu, \overline{x_i \mapsto v_i}}
+{\Gamma \vdash \mu & \overline{x_i \notin dom(\mu)}}
 }
 \end{tabular}
 \]
@@ -532,20 +536,23 @@ referring to the $\Sigma$, $M$ and $\Delta$ that $O$ is composed of we shall
 use the following notational conventions:
 
 \begin{itemize}
-\item $S \in O$, a predicate asserting $S$ is a state of $O$, is equivalent to
-$S \in \Sigma$.
-\item $m : T \Rightarrow S' \in O@S$, the method existence predicate, 
-states the method $m$ with return type $T$ exists in state $S$ and triggers a 
-transition to state $S'$ when called. Formally, $(S,m,T,S') \in \Delta$.
+\item $S \in O$ is the {\it state existence predicate} asserting 
+$S$ is a state of $O$. 
+Formally, this is equivalent to $S \in \Sigma$.
+\item $m : T \Rightarrow S' \in O@S$ is the {\it method existence predicate} 
+asserting the existence
+of method $m$ with return type $T$ in state $S$ which triggers a 
+transition to state $S'$ when called (where both $S \in O$ and $S' \in O$). 
+Formally, this is equivalent to $(S,m,T,S') \in \Delta$.
 \item $m : T \Rightarrow \overline{S'} \in O@\overline{S}$ is the extension
-of the previous to state sets, meaning that for all $S \in \overline{S}$
-there exists a state $S'$ and type $T'$ where 
-$(S,m,T',S') \in \Delta$ and that
+of the method existence predicate to state sets, meaning that for all 
+$S \in \overline{S}$ there exists a state and type 
+$T'$ where $(S,m,T',S') \in \Delta$ and that
 $T = \bigsqcup_{S \in \overline{S}} \{ T' | (S,m,T',S') \in \Delta \}$ exists
 and that $\overline{S'} = \{ S' | (S,m,T',S') \in \Delta \}$.
-\item $O@\overline{S} \sim O_2@\overline{S_2}$, the extension of the
-simulation relation to support state sets, can be interpreted as
-as $\bigsqcup_{S \in \overline{S}}O@S \sim \bigsqcup_{S_2 \in \overline{S_2}}O_2@S_2$.
+\item $O@\overline{S} \sim O_2@\overline{S_2}$ is the extension of the
+simulation relation to support state sets, and can be interpreted as
+$\bigsqcup_{S \in \overline{S}}O@S \sim \bigsqcup_{S_2 \in \overline{S_2}}O_2@S_2$.
 \end{itemize}
 
 \subsection{Effect types}
@@ -816,13 +823,15 @@ type inference. Our constraint grammar is shown in \figref{fig:congrammar}.
 \ottctxc\ottinterrule
 \otttyc\ottinterrule
 \otttinf\ottinterrule
+\ottoinf\ottinterrule
+\ottsinf\ottinterrule
 }
 \caption{\label{fig:congrammar} Constraint grammar}
 \end{figure}
 
 \begin{figure}
 \[
-\begin{array}{l}
+\begin{array}{ll}
 
 % unit value
 \inferlhs{\unitv} \triangleq \alpha = \unitt \cand \gamma = \gamma' 
@@ -837,35 +846,46 @@ type inference. Our constraint grammar is shown in \figref{fig:congrammar}.
 \\\\
 
 % object value
-\inferlhs{[ \overline{S_i \{ \overline{ m_{ij} = (v_{ij}, S_{ij}) } \} }]@S}
-\triangleq
-\exists \overline{\alpha_{ij}} . \\
-\alpha = \{ \overline{ S_i \{ \overline{ m_{ij} : \alpha_{ij} >> S_{ij} } \} }\}@S
+\inferlhs{[ \overline{S_i \{ \overline{ m_{ij} = (v_{ij}, S_{ij}) } \} }]@\overline{S}}
+\triangleq \\
+\exists \alpha_o, \alpha_s, \overline{\alpha_{ij}}, \gamma_{\emptyset} . \\
+\gamma_{\emptyset} = \emptyset
 \cand
+\alpha = \alpha_o@\alpha_s
+\cand
+\overline{\inferrule{\gamma_{\emptyset}}{v_{ij}}{\alpha_{ij}}{\gamma_{\emptyset}}}
+\cand
+\\
 \gamma = \gamma'
-\cand \\
-\overline{\inferrule{\gamma}{\triangleright v_{ij}}{\alpha_{ij}}{\gamma}}
+\cand
+\alpha_o @ \alpha_s = \{ \overline{ S_i \{ \overline{ m_{ij} : \alpha_{ij} >> S_{ij} } \} }\} @ \overline{S}
 \\\\
 
 % function value
-\inferlhs{\lambda ( \overline{x_i} ) . t} \triangleq
-\exists \gamma_r, \gamma_{in}, \gamma_{out}, \overline{\alpha_{ai}, \alpha_{bi}}, \alpha_r . \\
-\alpha = (\overline{\alpha_{ai} \gg \alpha_{bi}}) \rightarrow \alpha_r
+\inferlhs{\lambda ( \overline{x_i : T_i \gg T_i'} ) . t} \triangleq \\
+\exists \gamma_r, \gamma_{in}, \gamma_{out}, \overline{\alpha_i, \alpha_i'}, \alpha_r . \\
+\alpha = (\overline{\alpha_i \gg \alpha_i'}) \rightarrow \alpha_r
 \cand
 \gamma = \gamma'
 \cand
 \gamma_r = \emptyset
 \cand \\
-\gamma_{in} = \gamma_r, \overline{x_i : \alpha_{ai}}
+\gamma_{in} = \gamma_r, \overline{x_i : \alpha_i}
 \cand
-\overline{x_i : \alpha_{bi} \in \gamma_{out}}
+\overline{x_i : \alpha_i' \in \gamma_{out}}
 \cand
 \\
 \inferrule{\gamma_{in}}{t}{\alpha_r}{\gamma_{out}}
+\\
+\cand
+\overline{T_i <: \alpha_i}
+\cand
+\overline{\alpha_i' <: T_i'}
 \\\\
 
 % let binding
-\inferlhs{\lett{x}{t'}{t}} \triangleq \exists \gamma_v, \gamma_{b1}, \gamma_{b2}, \alpha' . \\
+\inferlhs{\lett{x}{t'}{t}} \triangleq \\
+\exists \gamma_v, \gamma_{b1}, \gamma_{b2}, \alpha' . \\
 \gamma_{b1} = \gamma_v, x : \alpha'
 \cand
 \gamma' = \gamma_{b2} - \{ x \}
@@ -876,7 +896,7 @@ type inference. Our constraint grammar is shown in \figref{fig:congrammar}.
 \\\\
 
 % sequence
-\inferlhs{t ; t'} \triangleq
+\inferlhs{t ; t'} \triangleq \\
 \exists \gamma'', \alpha' . \\
 \inferrule{\gamma}{t}{\alpha'}{\gamma''}
 \cand
@@ -884,7 +904,7 @@ type inference. Our constraint grammar is shown in \figref{fig:congrammar}.
 \\\\
 
 % function call
-\inferlhs{x ( \overline{x_i} )} \triangleq
+\inferlhs{x ( \overline{x_i} )} \triangleq \\
 \exists \overline{\alpha_i}, \overline{\alpha_i'}, \overline{\alpha_i''} . \\
 \overline{x_i : \alpha_i \in \gamma}
 \cand 
@@ -895,19 +915,17 @@ x : ( \overline{\alpha_i' \gg \alpha_i''} ) \rightarrow \alpha \in \gamma
 \\\\
 
 % method call
-\inferlhs{x.m} \triangleq
-\exists \alpha_x . \\
-x : \alpha_x \in \gamma
-\cand 
-\cand  \\
-\gamma' = \gamma[ x \mapsto \remapapp{\alpha_x}{O@S}{O@S'} ]
+\inferlhs{x.m} \triangleq \\
+\exists \alpha_o, \alpha_s . \\
+x : \alpha_o@\alpha_s \in \gamma
+\cand \\
+\gamma' = \gamma[ x \mapsto \remapapp{\alpha_o@\alpha_s}{O@S}{O@S'} ]
 \\
-\mathrm{where } O = \{ S \{ m : \alpha \Rightarrow S' \} S' \{ \} \}
+\mathbf{where}\; O = \{ S \{ m : \alpha \Rightarrow S' \} S' \{ \} \}
 \\\\
 
 % if-then-else
-\inferlhs{\ift{t_c}{t_t}{t_f}} \triangleq
-\\
+\inferlhs{\ift{t_c}{t_t}{t_f}} \triangleq \\
 \exists \alpha_c, \alpha_t, \alpha_f, \gamma_c, \gamma_t, \gamma_f . \\
 \inferrule{\gamma}{t_c}{\alpha_c}{\gamma_c}
 \cand
@@ -919,7 +937,7 @@ x : \alpha_x \in \gamma
 \alpha_c = \boolt
 \cand
 \\
-\alpha = \alpha_t \sqcup \alpha_f
+\alpha = \alpha_t \sqcupplus \alpha_f
 \cand
 \gamma' = \gamma_t \sqcup \gamma_f
 \\\\
