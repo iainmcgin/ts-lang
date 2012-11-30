@@ -236,11 +236,11 @@ $(S, m, S') \in \Delta \implies \nexists S'' \:\mathrm{st.}\: S' \neq S''
 The subtyping relation $<:$ is defined in terms of a
 {\it simulation preorder}. Given $O = \langle M, \Sigma, \Delta \rangle$ and
 $O_2 = \langle M_2, \Sigma_2, \Delta_2 \rangle$, the simulation preorder
-$\sim$
-is defined to be the largest relation such that if $O@S \sim O_2@S_2$ then for all
+$\precsim$
+is defined to be the largest relation such that if $O@S \precsim O_2@S_2$ then for all
 $m$ and $S_4$ such that $(S_2, m, S_4) \in \Delta_2$ there exists an $S_3$ such that
-$(S, m, S_3) \in \Delta$ and that $O@S_3 \sim O_2@S_4$.
-Subtyping is defined such that $O@S <: O_2@S_2 \iff O@S \sim O_2@S_2$.
+$(S, m, S_3) \in \Delta$ and that $O@S_3 \precsim O_2@S_4$.
+Subtyping is defined such that $O@S <: O_2@S_2 \iff O@S \precsim O_2@S_2$.
 
 A perhaps more intuitive basis for subtyping
 uses the notion of {\it trace inclusion}. The set of interaction traces 
@@ -261,7 +261,7 @@ Subtyping is therefore defined such that
 $O@S <: O_2@S_2 \iff \Tr(O_2@S_2) \subseteq \Tr(O@S)$. 
 
 It is easy to
-show that $O@S \sim O_2@S_2 \iff \Tr(O_2@S_2) \subseteq \Tr(O@S)$, so these
+show that $O@S \precsim O_2@S_2 \iff \Tr(O_2@S_2) \subseteq \Tr(O@S)$, so these
 interpretations of subtyping can be used interchangeably wherever necessary.
 
 Either view of subtyping is also easy to relate to the Liskov substitution 
@@ -535,7 +535,7 @@ safely invoked on each individual $O@S$, where $S \in \overline{S}$, and that
 a least upper bound of the return types exists.
 
 In general, the set of
-types in TS is a disjoint union of join semi-lattices.
+types in TS is a join semi-lattice, with $\top$ as the greatest element.
 
 \subsection{Extra notational conventions}
 
@@ -558,9 +558,9 @@ $S \in \overline{S}$ there exists a state and type
 $T'$ where $(S,m,T',S') \in \Delta$ and that
 $T = \bigsqcup_{S \in \overline{S}} \{ T' | (S,m,T',S') \in \Delta \}$ exists
 and that $\overline{S'} = \{ S' | (S,m,T',S') \in \Delta \}$.
-\item $O@\overline{S} \sim O_2@\overline{S_2}$ is the extension of the
+\item $O@\overline{S} \precsim O_2@\overline{S_2}$ is the extension of the
 simulation relation to support state sets, and can be interpreted as
-$\bigsqcup_{S \in \overline{S}}O@S \sim \bigsqcup_{S_2 \in \overline{S_2}}O_2@S_2$.
+$\bigsqcup_{S \in \overline{S}}O@S \precsim \bigsqcup_{S_2 \in \overline{S_2}}O_2@S_2$.
 \end{itemize}
 
 \subsection{Effect types}
@@ -704,10 +704,10 @@ with that of the output portion of the effect type after the call. However,
 this will often result in an unacceptable loss of type information,
 reducing the number of valid programs which can be typed within the system.
 
-It is clear that as $\ot{O}{S} \sim \ot{O_2}{S_2}$ there must exist some
-$\overline{S_3}$ such that $\ot{O}{S_3} \sim \ot{O_2}{S_4}$.
+It is clear that as $\ot{O}{S} \precsim \ot{O_2}{S_2}$ there must exist some
+$\overline{S_3}$ such that $\ot{O}{S_3} \precsim \ot{O_2}{S_4}$.
 One possible solution would be to choose
-$\overline{S_3} = \{ S | O@S \sim \ot{O_2}{S_4} \}$. This is not specific
+$\overline{S_3} = \{ S | O@S \precsim \ot{O_2}{S_4} \}$. This is not specific
 enough however --- given the object protocols from \figref{fig:principalex},
 $\overline{S_3} = \{ A, B, C, D \}$ as there are no possible method calls
 on states $E$ or $H$ of $O_2$.
@@ -718,11 +718,11 @@ define a relation between pairs of object types
 $(O@\overline{S}, O_2@\overline{S_2} \lesssim 
 (O@\overline{S'}, O_2@\overline{S_2'})$, which we call the
 {\it simulation predecessor relation}. The definition of this relation
-is given in \figref{fig:simreach}. Essentially, if $O@S \sim O_2@S_2$ and there
+is given in \figref{fig:simreach}. Essentially, if $O@S \precsim O_2@S_2$ and there
 exists a sequence of method calls that would transition an object value of type
 $O_2@\overline{S_2}$ to $O_2@\overline{S_4}$, then this sequence of method calls
 would transition an object in state $O@\overline{S}$ to $O@\overline{S_3}$
-such that $O@\overline{S_3} \sim O@\overline{S_4}$. This is abbreviated to
+such that $O@\overline{S_3} \precsim O@\overline{S_4}$. This is abbreviated to
 $(O@\overline{S}, O_2@\overline{S_2}) \lesssim (O@\overline{S_3}, O@\overline{S_4})$.
 
 Using this relation, we can choose $\overline{S_3} = 
@@ -740,7 +740,7 @@ will therefore be $\overline{S_3} = \{ A \}$.
   {(O@\overline{S}, O_2@\overline{S_2}) \lesssim (O@\overline{S_3}, O_2@\overline{S_4})}
   {
     \begin{array}{cc}
-    O@\overline{S} \sim O_2@\overline{S_2}
+    O@\overline{S} \precsim O_2@\overline{S_2}
     \\
     m : T_i \Rightarrow \overline{S_4} \in O@\overline{S_2}
     \\
@@ -750,7 +750,7 @@ will therefore be $\overline{S_3} = \{ A \}$.
 \\\\
 \infer[\lesssim\textsc{-refl}]
   {(O@\overline{S}, O_2@\overline{S_2}) \lesssim (O@\overline{S}, O_2@\overline{S_2})}
-  {O@\overline{S} \sim O_2@\overline{S_2}}
+  {O@\overline{S} \precsim O_2@\overline{S_2}}
 \\\\
 \infer[\lesssim\textsc{-trans}]
   {
@@ -1342,7 +1342,7 @@ The basic types $\boolt$, $\unitt$ and $\funt{T_i}{U_i}{V}$ exhibit
 {\it structural subtyping}. However object types do not. If we treat object 
 type expressions as atoms,
 then a standard constraint solver which supports structural subtyping such as 
-\ref{Simonet2003} can be used. This solver will find solutions for all of the 
+\cite{Simonet2003} can be used. This solver will find solutions for all of the 
 variables that concern structural types, and leave a set of constraints between 
 object type variables which we must solve through some other mechanism. 
 This is the approach taken for the type constraints for TS1, which separates 
@@ -1648,6 +1648,7 @@ which we believe makes the approach intuitive.
 \appendix
 
 \section{Soundness}
+\label{app:soundness}
 
 \begin{thm}[Progress and Preservation]
 Given a term $t$ such that $\typerule{\Gamma}{t}{T}{\Gamma'}$
@@ -1896,7 +1897,7 @@ $T <: V$.
 \item $V = O@\overline{S'}$ for some $O$ and $\overline{S'}$. By
 \remapobj, $O'@\overline{S'''} = \remapapp{T}{U}{V}$ where 
 $T = O'@\overline{S''}$ and $U = O@\overline{S}$ and
-$\overline{S'''} = \{ S | O'@S \sim O@\overline{S'}, S \in O' \}$ 
+$\overline{S'''} = \{ S | O'@S \precsim O@\overline{S'}, S \in O' \}$ 
 for some $O'$, $\overline{S}$ and $\overline{S''}$. By \subobj,
 $T = O'@\overline{S'''} <: O@\overline{S'} = V$ as for each $S \in \overline{S'''}$,
 $O'@S <: O@\overline{S'}$.
@@ -1936,10 +1937,10 @@ $T = U$, and $U <: T$ by \subrefl.
 \item $V = O@\overline{S}$ for some $O$ and $\overline{S}$. 
 It follows that $U = O'@\overline{S'}$ 
 for some $O'$ and $\overline{S'}$ 
-such that $O'@\overline{S'} \sim O@\overline{S}$ 
+such that $O'@\overline{S'} \precsim O@\overline{S}$ 
 by rule \subobj. 
 By rule \remapobj, it follows that $T = O'@\overline{S''}$ 
-such that $\overline{S''} = \{ S | O'@S \sim O@\overline{S}, S \in O' \}$.
+such that $\overline{S''} = \{ S | O'@S \precsim O@\overline{S}, S \in O' \}$.
 By \lemref{lem:ssetinc} it follows that 
 $O'@\overline{S'} <: O'@\overline{S''}$.
 
@@ -2053,14 +2054,14 @@ There are two cases to consider:
 \item $x = y$. It follows that $\Gamma = \Gamma_1 = \Gamma'$ and
 that $T = O@\overline{S}, V = O@\overline{S'}$.
 $T'$ must be of form $O'@\overline{S}''$ such that
-$O'@\overline{S}'' \sim O@\overline{S}$ by rule \subobj.
+$O'@\overline{S}'' \precsim O@\overline{S}$ by rule \subobj.
 
 Let $V' = O'@\overline{S}''' = \remapapp{T'}{T}{V}$
 where
 $S''' = \{ S_n' | m : T_r' \Rightarrow S_n' \in O'@S'', S'' \in \overline{S}''\}$.
 Let $U' = \bigsqcup{ \{ T_r' | m : T_r' \Rightarrow S_n' \in O'@S'', S'' \in \overline{S}'' \} }$.
-As $O'@\overline{S}'' \sim O@\overline{S}$, it follows that
-$O'@\overline{S}''' \sim O@\overline{S}'$.
+As $O'@\overline{S}'' \precsim O@\overline{S}$, it follows that
+$O'@\overline{S}''' \precsim O@\overline{S}'$.
 Therefore, $U' <: U$ and $V' <: V$. By the rule \tmethc, and \tsub
 to replace $U'$ with $U$, it follows that
 $\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.

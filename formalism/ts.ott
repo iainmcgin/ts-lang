@@ -92,6 +92,8 @@ T, U, V :: 'T_' ::=
     {{ com object }}
   | ( </ Ti >> Ti' // i /> ) -> T         ::  :: Fun
     {{ com function }}
+  | Top                                   ::  :: Top
+    {{ com top }}
   | forall </ ai // i /> . T              :: M:: UniType
     {{ com universal quantification }}
 
@@ -243,7 +245,7 @@ terminals :: 'terminals_' ::=
   | cap          ::  :: cap        {{ tex \cap }}
   | and          ::  :: booland    {{ tex \wedge }}
   | or           ::  :: boolor     {{ tex \vee }}
-  | sim          ::  :: simulation {{ tex \sim }}
+  | sim          ::  :: simulation {{ tex \precsim }}
   | join         ::  :: join       {{ tex \sqcup }}
   | meet         ::  :: meet       {{ tex \sqcap }}
   | union        ::  :: union      {{ tex \cup }}
@@ -255,6 +257,7 @@ terminals :: 'terminals_' ::=
   | true         ::  :: true       {{ tex \mathtt{true} }}
   | false        ::  :: false      {{ tex \mathtt{false} }}
   | joinplus     ::  :: joinplus   {{ tex \sqcup }}
+  | Top          ::  :: top        {{ tex \top }}
 
 %-------------------------------------------------------------------------------
 % OPERATIONAL SEMANTICS
@@ -476,6 +479,9 @@ defns Jty :: '' ::=
   T <: T'  ::  ::subtype::'sub_'
   {{ com [[T]] is a subtype of [[T']] }}
   by
+
+    -------- :: top
+    T <: Top
 
     ------- :: refl
     T <: T
