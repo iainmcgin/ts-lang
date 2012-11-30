@@ -254,7 +254,7 @@ terminals :: 'terminals_' ::=
   | unit         ::  :: unit       {{ tex \mathtt{unit} }}
   | true         ::  :: true       {{ tex \mathtt{true} }}
   | false        ::  :: false      {{ tex \mathtt{false} }}
-  | joinplus     ::  :: joinplus   {{ tex \sqcupplus }}
+  | joinplus     ::  :: joinplus   {{ tex \sqcup }}
 
 %-------------------------------------------------------------------------------
 % OPERATIONAL SEMANTICS

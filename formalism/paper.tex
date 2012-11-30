@@ -32,6 +32,7 @@
 \newcommand{\figref}[1]{Figure \ref{#1}}
 \newcommand{\lstref}[1]{Listing \ref{#1}}
 \newcommand{\appref}[1]{Appendix \ref{#1}}
+\newcommand{\thmref}[1]{Theorem \ref{#1}}
 \newcommand{\lemref}[1]{Lemma \ref{#1}}
 \newcommand{\corref}[1]{Corollary \ref{#1}}
 
@@ -841,20 +842,20 @@ type inference. Our constraint grammar is shown in \figref{fig:congrammar}.
 \begin{array}{ll}
 
 % unit value
-\inferlhs{\unitv} \triangleq \alpha = \unitt \cand \gamma' = \gamma
+\inferlhs{\unitv} \coloneqq \alpha = \unitt \cand \gamma' = \gamma
 \\\\
 
 % true value
-\inferlhs{\truev} \triangleq \alpha = \boolt \cand \gamma' = \gamma 
+\inferlhs{\truev} \coloneqq \alpha = \boolt \cand \gamma' = \gamma 
 \\\\
 
 % false value
-\inferlhs{\falsev} \triangleq \alpha = \boolt \cand \gamma' = \gamma 
+\inferlhs{\falsev} \coloneqq \alpha = \boolt \cand \gamma' = \gamma 
 \\\\
 
 % object value
 \inferlhs{[ \overline{S_i \{ \overline{ m_{ij} = (v_{ij}, S_{ij}) } \} }]@\overline{S}}
-\triangleq \\
+\coloneqq \\
 \exists \alpha_o, \alpha_s, \overline{\alpha_{ij}}, \gamma_{\emptyset} . \\
 \gamma_{\emptyset} = \emptyset
 \cand
@@ -869,7 +870,7 @@ type inference. Our constraint grammar is shown in \figref{fig:congrammar}.
 \\\\
 
 % function value
-\inferlhs{\lambda ( \overline{x_i : T_i \gg T_i'} ) . t} \triangleq \\
+\inferlhs{\lambda ( \overline{x_i : T_i \gg T_i'} ) . t} \coloneqq \\
 \exists \gamma_r, \gamma_{in}, \gamma_{out}, \overline{\alpha_i, \alpha_i'}, \alpha_r . \\
 \alpha = (\overline{\alpha_i \gg \alpha_i'}) \rightarrow \alpha_r
 \cand
@@ -891,7 +892,7 @@ type inference. Our constraint grammar is shown in \figref{fig:congrammar}.
 \\\\
 
 % let binding
-\inferlhs{\lett{x}{t'}{t}} \triangleq \\
+\inferlhs{\lett{x}{t'}{t}} \coloneqq \\
 \exists \gamma_v, \gamma_{in}, \gamma_{out}, \alpha' . \\
 \gamma_{in} = \gamma_v, x : \alpha'
 \cand
@@ -903,7 +904,7 @@ type inference. Our constraint grammar is shown in \figref{fig:congrammar}.
 \\\\
 
 % sequence
-\inferlhs{t ; t'} \triangleq \\
+\inferlhs{t ; t'} \coloneqq \\
 \exists \gamma'', \alpha' . \\
 \inferrule{\gamma}{t}{\alpha'}{\gamma''}
 \cand
@@ -911,7 +912,7 @@ type inference. Our constraint grammar is shown in \figref{fig:congrammar}.
 \\\\
 
 % function call
-\inferlhs{x ( \overline{x_i} )} \triangleq \\
+\inferlhs{x ( \overline{x_i} )} \coloneqq \\
 \exists \overline{\alpha_i}, \overline{\alpha_i'}, \overline{\alpha_i''} . \\
 \overline{x_i : \alpha_i \in \gamma}
 \cand 
@@ -922,7 +923,7 @@ x : ( \overline{\alpha_i' \gg \alpha_i''} ) \rightarrow \alpha \in \gamma
 \\\\
 
 % method call
-\inferlhs{x.m} \triangleq \\
+\inferlhs{x.m} \coloneqq \\
 \exists \alpha_o, \alpha_s . \\
 x : \alpha_o@\alpha_s \in \gamma
 \cand \\
@@ -932,7 +933,7 @@ x : \alpha_o@\alpha_s \in \gamma
 \\\\
 
 % if-then-else
-\inferlhs{\ift{t_c}{t_t}{t_f}} \triangleq \\
+\inferlhs{\ift{t_c}{t_t}{t_f}} \coloneqq \\
 \exists \alpha_c, \alpha_t, \alpha_f, \gamma_c, \gamma_t, \gamma_f . \\
 \inferrule{\gamma}{t_c}{\alpha_c}{\gamma_c}
 \cand
@@ -973,7 +974,7 @@ empty context cannot --- this difference allows the detection of unbound
 variable usage within function bodies and the collection of free variables
 in the root term.
 
-Additionally, we have {\bf variable usage constraints} of form 
+Additionally, we have {\it variable usage constraints} of form 
 $x : \tinf \in \gamma$, which are generated for each location in the
 program where a variable is used and what type that usage implies. These
 are used to generate additional type variable
@@ -981,9 +982,13 @@ constraints by matching the asserted type $\tinf$ with what is known
 about the type of $x$ in $\gamma$.
 
 \item {\bf Type expressions constraints} --- these express 
-constraints between two or three types: either two types are equal,
-or one type is the join of two others. The latter form of type constraint
-is generated when dealing with if-then-else terms.
+relationships between types. Either two types are equal ($\tinf = \tinf'$),
+one type is a subtype of another ($\tinf <: \tinf'$) or one type
+is the join of two others ($\tinf \sqcup \tinf'$). As a special case of
+the latter, if it is known that the two types are derived from
+interactions with the same value, this is written as $\tinf \veebar \tinf'$.
+This additional information is relevant when solving object type constraints
+in particular, and is discussed later.
 \end{itemize}
 
 Type variables can appear at any position within a type's structure, as shown
@@ -995,8 +1000,8 @@ stage in the type inference process.
 A constraint generation expression $\inferlhs{t}$, which relates the term
 to an input context variable, a type variable and an output context variable, 
 is expanded using the rules shown in \figref{fig:constraintgen}.
-The constraint generation process for a root term $t$ begins with
-$\exists \gamma, \gamma', \alpha. \free{\gamma} \cand \inferlhs{t}$.
+The constraint generation process for a root term is defined
+by the function $gen(t) = \exists \gamma, \gamma', \alpha. \free{\gamma} \cand \inferlhs{t}$.
 
 The constraint generation rules correspond to the typing judgements for 
 well-typed terms as one would expect:
@@ -1004,25 +1009,24 @@ well-typed terms as one would expect:
 \begin{itemize}
 \item All value terms produce a $\gamma = \gamma'$ constraint as values do
 not change the context. Additionally, a type variable constraint of form
-$\alpha = \tinf$ where $\tinf$ is of the appropriate type to match
-the value, with type variables in all positions relating to parameters and return
-values.
-\item The context variable $\gamma_a$ used as the input context for
-function bodies has an empty root $\gamma_r$, to allow for detection of 
+$\alpha = \tinf$ is generated where $\tinf$ is of the appropriate type to 
+match the value. In the case of functions or object values, this type will
+contain additional type variables for parameters and return values, with
+the intention that these be solved to validate user type annotations.
+\item The context variable $\gamma_{in}$ used as the input context for
+function bodies has an empty root $\gamma_r$. This allows for the detection of 
 used unbound variables within
-the body. This matches the use of a context in type inference
-composed only of the parameters, and prevents implicit binding.
+the body term. The domain of the input context is strictly composed of the 
+parameters, preventing implicit binding, in order to match the properties
+of the typing judgement for functions.
 \item Let-bind terms generates a new context variable $\gamma_v$ for the
-output context of the value term. This is extended by $\gamma_{b1}$, the
+output context of the value term. This is extended by $\gamma_{in}$, the
 input context for the body term, with variable $x$ of the type inferred
-for the value. The output context of the whole let-bind term removes
-$x$ from the output context $\gamma_{b2}$ of the body term.
-\item Update terms generate replacement constraints based on the inferred
-type $\alpha'$ of the right-hand side of the expression.
+for the value. The output context $\gamma'$ of the whole let-bind term removes
+$x$ from the output context $\gamma_{out}$ of the body term.
 \item Sequencing terms relate the output of the left term to the input of the
 right term through a new context variable $\gamma''$. The type variable
-$\alpha'$ must be generated to capture the type of the left term for
-consistency, but it is not needed.
+$\alpha'$ is generated to infer the type of the left term, though this is not needed beyond confirming that it does in fact have a type.
 \item Function call terms generate context variable constraints to relate the
 usage of the variables to whatever information has been inferred about the
 parameter types of the function. All variables $\overline{x_i}$ used as 
@@ -1032,12 +1036,17 @@ of the function.
 \item Method call terms generate type variables to capture that $x$ must
 be an object, that the method $m$ must exist in the current state $\alpha_s$
 and that after the method call $x$ must be in the new state $\alpha_s'$.
+\item If-then-else terms relate the context variables used for the
+condition, true branch and false branch as expected. It is asserted that the
+type of the condition must be a boolean. The output context
+variable $\gamma'$ is expressed as the join of the outputs for the true
+and false branches.
 \end{itemize}
 
 \subsection{Constraint solving}
 
 Constraint solving is performed in phases. First, generated context constraints
-for a term $t$ aresolved, which determines the contents of each context associated to
+for a term $t$ are solved, which determines the contents of each context associated to
 each context variable in the typing derivation of $t$, and produces additional
 type equality constraints (of form $\mathbb{T} = \mathbb{T}'$) based on
 observed usages of variables. If a variable either used in a context where
@@ -1054,87 +1063,22 @@ will be reported.
 
 \subsection{Context constraint solving}
 
-Solving context constraints involves {\it normalising} the constraints. 
-Normalisation means that every context variable will have a single 
+Solving context constraints involves {\it normalising} the constraints.
+A {\it normalised} constraint is one in which
+context variable has a single 
 defining constraint of form $\gamma = \emptyset$, $\free{\gamma}$ or
 $\gamma = \gamma', \overline{x_i : \tinf_i}$, where $\gamma'$ is
 either empty or free. A context $\Gamma$ for type checking can be easily
 constructed from constraints in this form, as once the type variable
 constraints are solved we can say $\Gamma = \overline{x_i : T_i}$ for
 every $\gamma = \gamma', \overline{x_i : \tinf_i}$ where $T_i$ is the
-solved form of $\tinf_i$.
+solved form of $\tinf_i$, or $\Gamma = \emptyset$ for every $\free{\gamma}$
+or $\gamma = \emptyset$.
 
 We say that a constraint $C$ is {\it normalisable} if, by
 applying the rules in \figref{fig:contextsolve}, it can be transformed to
-a constraint $C'$ which is normalised or the rules produce $\mathbf{bound}\:x$
+a constraint $C'$ which is normalised, or the rules produce $\mathbf{bound}\:x$
 or $\mathbf{unbound}\:x$ for some variable $x$.
-
-The context normalisation rules do the following:
-
-\begin{itemize}
-\item \textsc{ceq} --- Where $\gamma$ is directly equivalent
-to $\gamma'$, which is defined in terms of extension of
-$\gamma''$, rewrite the constraints such that
-$\gamma$ directly copies the extension of $\gamma''$.
-\item \textsc{crem} --- Where $\gamma$ removes a variable $x$ from $\gamma'$,
-which is defined in terms of extension of $\gamma''$, rewrite the
-constraints such that $\gamma$ copies the extension of $\gamma''$ with
-the variable $x$ removed from the extension. There is no need for an
-error-producing variant of \textsc{crem}, where the variable $x$ is missing, 
-as context removal constraints are always generated in a pair with a context 
-extension constraint for let binding.
-\item \textsc{cext} --- Where $\gamma$ extends $\gamma'$ with
-a variable set $\overline{y_j}$, and $\gamma'$ is defined in terms of extension of
-$\gamma''$ with a disjoint set of variables in its extension set, rewrite the
-constraints such that $\gamma$'s extension set includes both the $y_j$
-definitions and $x_j$ definitions.
-\item $\textsc{cext}_2$ --- Where $\gamma$ extends $\gamma'$ with
-a new variable $x$, and $\gamma'$ is defined in terms of extension of
-some $\gamma''$ and the extension set already contains $x$, this
-represents an attempt to redeclare $x$. As such, generate an error
-$\mathbf{bound}\:x$, terminating the constraint solving process.
-\item \textsc{crep} --- where $\gamma$ replaces the type of some
-variable $x$ in $\gamma'$, where $\gamma$ is defined in terms of extension
-of $\gamma''$ and $x$ is in the extension set, rewrite the constraints
-such that $\gamma$ copies the extension set of $\gamma'$ with $x$
-replaced as specified.
-\item $\textsc{crep}_2$ --- where $\gamma$ replaces variable $x$ in
-$\gamma'$ which is defined in terms of extension of $\gamma''$
-which is free and $x$ is not in the extension set, $x$ is a
-free variable in the term being processed. To introduce $x$ in such a way that
-it will be included in all contexts, $\gamma''$ is redefined in
-terms of extension of a new context $\gamma_r$ with variable $x$
-in the extension set mapped to a new type variable $\alpha$. Following
-this, \textsc{cext} can be applied to $\gamma'$, then \textsc{crep} can
-be applied to $\gamma$.
-\item $\textsc{crep}_3$ --- where $\gamma$ replaces variable $x$ in
-$\gamma'$ which is defined in terms of an empty root $\gamma''$,
-and $x$ is not in $\gamma$'s extension set, this indicates the usage
-of an unbound variable within a function body. As such, generate an
-error $\mathbf{unbound}\:x$ indicating that x is unbound within this
-context, terminating the contraint solving process.
-\item \textsc{cvar} --- where a variable constraint for $x$ exists
-for context variable $\gamma$, which is defined in terms of
-extension of $\gamma_r$ which is free, and $x$ is not in the extension
-set of $\gamma$, $x$ is a free variable in the term being processed. 
-Similar to $\textsc{crep}_2$, redefine $\gamma_r$
-in terms of extension of a new root $\gamma_r'$, with $x$ in
-the extension set with the observed type $\tinf$.
-\item $\textsc{cvar}_2$ --- where a variable constraint for $x$ exists
-for context variable $\gamma$, which is defined in terms of $\gamma'$
-which is empty, and $x$ is not in the extension set of $\gamma$, 
-$x$ is an unbound variable within a function body.
-\end{itemize}
-
-The rules are repeatedly applied to any matching sets of constraints
-until no further rewriting is possible, producing either an error
-or a set of context constraints which are fully normalised, and
-can be converted into contexts for type checking easily.
-
-The way in which the context constraints are generated guarantees
-that the dependencies between contexts form a directed acyclic graph. For
-this reason, we believe that that the first phase will always terminate,
-but this has not yet been proven.
 
 \begin{figure}
 
@@ -1223,6 +1167,15 @@ but this has not yet been proven.
 	x \notin \overline{x_i}
 	}
 \\\\
+\infer[\textsc{t\_var}]
+	{
+	\tinf' <: \tinf \cand 
+	\gamma = \gamma', \overline{x_i : \tinf_i}, x : \tinf'
+	}
+	{
+	x : \tinf \in \gamma \cand 
+	\gamma = \gamma', \overline{x_i : \tinf_i}, x : \tinf'}
+\\\\
 	\infer[\textsc{c\_join}]
 	{
 	\begin{array}{c}
@@ -1254,38 +1207,171 @@ but this has not yet been proven.
 \caption{\label{fig:contextsolve} Context normalisation}
 \end{figure}
 
+The context normalisation rules do the following:
+
+\begin{itemize}
+\item $\textsc{c\_eq}$ --- Where $\gamma$ is directly equivalent
+to $\gamma'$, which is defined in terms of extension of
+$\gamma''$, rewrite the constraints such that
+$\gamma$ directly copies the definition of $\gamma'$.
+\item $\textsc{c\_eq\_2}$ --- Where $\gamma$ is directly equivalent
+to $\gamma'$, which is defined as either $\free{\gamma}$ or 
+$\gamma = \emptyset$, $\gamma'$ is defined to be an empty extension of 
+$\gamma'$.
+
+\item $\textsc{c\_rem}$ --- Where $\gamma$ removes a variable $x$ from $\gamma'$,
+which is defined in terms of extension of $\gamma''$ that is known to have
+$x$ in its domain, rewrite the
+constraints such that $\gamma$ copies the definition $\gamma''$ with
+the variable $x$ removed from the extension. There is no need for an
+error-producing variant of \textsc{c\_rem}, where the variable $x$ is missing, 
+as context removal constraints are always generated in a pair with a context 
+extension constraint for let binding.
+
+\item $\textsc{c\_ext}$ --- Where $\gamma$ extends $\gamma'$ with
+a variable set $\overline{y_j}$, and $\gamma'$ is defined in terms of extension of
+$\gamma''$ with a disjoint set of variables in its extension set, rewrite the
+constraint such that $\gamma$'s extension set includes both the $y_j$
+definitions and $x_j$ definitions.
+
+\item $\textsc{c\_ext}_2$ --- Where $\gamma$ extends $\gamma'$ with
+a new variable $x$, and $\gamma'$ is defined in terms of extension of
+some $\gamma''$ and the extension set already contains $x$, this
+represents an attempt to redeclare $x$. As such, generate an error
+$\mathbf{bound}\:x$, terminating the constraint solving process.
+
+\item $\textsc{c\_rep}$ --- where $\gamma$ replaces the type of some
+variable $x$ in $\gamma'$, where $\gamma$ is defined in terms of extension
+of $\gamma''$ and $x$ is in the extension set, rewrite the constraints
+such that $\gamma$ copies the extension set of $\gamma'$ with $x$
+replaced as specified.
+
+\item $\textsc{c\_rep}_2$ --- where $\gamma$ replaces variable $x$ in
+$\gamma'$ which is defined in terms of extension of $\gamma''$
+which is free and $x$ is not in the extension set, $x$ is a
+free variable in the term being processed. To introduce $x$ in such a way that
+it will be included in all contexts, a variable usage constraint
+$x : \alpha \in \gamma''$ is introduced, with the intention that this be
+solved by $c\_var\_1$ or $c\_var\_2$ first before the replacement can be
+solved using $c\_rep\_1$.
+
+\item $\textsc{crep}_3$ --- this performs the same function as
+$c\_rep\_2$, but for the case where $\gamma$ is directly defined as
+a replacement on a free or empty context variable $\gamma'$.
+
+\item $\textsc{c\_var\_1}$ --- where $x$ is asserted to exist in a context
+variable $\gamma$, which is defined as $\free{\gamma}$, the definition
+of $\gamma$ is replaced with one which extends a new free context variable
+$\gamma'$ with the variable $x$. This is intended to also have the effect
+that all other context variables which are defined as extensions of 
+$\gamma$ will have to be updated using \textsc{c\_ext}, or an error
+generated by \textsc{c\_ext} if they already contain $x$.
+
+\item $\textsc{c\_var\_2}$ --- where $x$ is asserted to exist in a
+context variable $\gamma$, which is defined as $\gamma = \emptyset$, this
+represents the attempt to use an unbound variable in a context which does
+not permit free variables (such as in the body of a function). As such,
+an $\mathbf{unbound}\:x$ error is generated.
+
+\item $\textsc{c\_var\_3}$ --- where $x$ is asserted to exist
+in a context variable $\gamma$, which is defined in terms of
+extension of $\gamma'$ which does not include $x$, the assertion
+can be rewritten as an assertion that $x$ must exist within $\gamma'$.
+This is intended to propagate to a root context variable and solved
+by \textsc{c\_var\_1} or \textsc{c\_var\_2}.
+
+\item $\textsc{c\_join}$ --- where a context variable is defined as the
+join of two other context variables $\gamma'$ and $\gamma''$, which are in turn defined as extensions
+of the same context variable $\gamma_r$, and which contain the same variables,
+the join can be solved by generating a new set of type variables, one for
+each $x_i$, defined as the join of the types known for $x_i$ in $\gamma'$
+and $\gamma''$.
+\end{itemize}
+
+The rules are repeatedly applied to any matching sets of constraints
+until no further rewriting is possible, producing either an error
+or a set of context constraints which are fully normalised, and
+can be converted into contexts for type checking easily.
+
+Given an arbitrary term $t$, the context constraints generated by $t$
+are normalisable (see \appref{app:ctx_norm}).
+This is less general than stating that the context constraint solving rules
+can solve any conjunction of context constraints, but is sufficient for
+the purposes of this language.
 
 \subsection{Additional type variable constraint solving}
 
-In the second phase, additional type variable 
-constraints are generated by following the rule in \figref{fig:tvargen}, which
-compares the observed type from the usage of a variable to the type
-known in the context. Repeated application of this rule until no more matches
-are found produces a constraint set composed exclusively of normalised
-context variable constraints, and type variable constraints. At this point, 
-we can focus on the type variable constraints exclusively as the context
-variable constraints have no further contribution to the overall solution.
-
-\begin{figure}
-\[
-	\infer[\textsc{tvar}]
-	{\tinf = \tinf' \cand \gamma = \gamma', \overline{x_i : \tinf_i}, x : \tinf'}
-	{x : \tinf \in \gamma \cand \gamma = \gamma', \overline{x_i : \tinf_i}, x : \tinf'}
-\]
-\caption{\label{fig:tvargen} Refining type variable constraints}
-\end{figure}
+During context constraint solving, a number of additional type variable
+constraints are generated by rule \textsc{t\_var} and \textsc{c\_join}.
+These, in addition to the original type variable constraints generated
+directly from the term under consideration, form the constraint set that
+is to be solved by the type variable constraint solving phase.
 
 \subsection{Type variable constraint solving}
 
+Solving a set of type variable constraints consists of demonstrating that
+there exists at least one substitution $\sigma$ for all type variables that 
+turns all constraints into tautologies.
 
-\subsection{Object variable constraint solving}
+For instance, the constraint
+$\alpha = \boolt \cand \alpha' <: \alpha$ has exactly one type variable 
+substitution that provides a valid solution, which is 
+$\sigma = \{ (\alpha, \boolt), (\alpha', \boolt) \}$. 
 
-Normalised object variable constraints are of the forms listed in
-\figref{fig:objconstraints}. Given a set of such normalised
+A constraint may have no solution, such as the constraint 
+$\unitt <: \alpha \cand \alpha <: \boolt$, where no type can satisfy the upper
+and lower bounds specified on $\alpha$.
+
+A constraint may also have an infinite number of solutions, such as 
+$\alpha <: \{ S \{ m : \alpha' \Rightarrow S' \} S' \{\} \}$, where
+$\alpha'$ can be any valid type and $\alpha$ can be any object type which 
+allows at least one call to the method $m$, which must return the type 
+$\alpha'$.
+
+The goal of the type constraint solver is to find the most general substitution
+such that all other possible substitutions are {\it refinements} of this base
+substitution, written $\sigma \sqsubset \sigma'$. This means that 
+$dom(\sigma) \subseteq dom(\sigma')$ and that 
+$\forall x \in dom(\sigma)$ . $\sigma'(x) <: \sigma(x)$.
+
+The type system of TS1 does not support type variables, therefore any
+set of constraints for which a concrete lower type bound cannot be found 
+for every type variable has no solution.
+
+The basic types $\boolt$, $\unitt$ and $\funt{T_i}{U_i}{V}$ exhibit 
+{\it structural subtyping}. However object types do not. If we treat object 
+type expressions as atoms,
+then a standard constraint solver which supports structural subtyping such as 
+\ref{Simonet2003} can be used. This solver will find solutions for all of the 
+variables that concern structural types, and leave a set of constraints between 
+object type variables which we must solve through some other mechanism. 
+This is the approach taken for the type constraints for TS1, which separates 
+the task of {\it object constraint solving} from the main type constraint 
+solving phase.
+
+\subsection{Object constraint solving}
+
+This phase of the algorithm is only concerned with constraints of the form
+listed in \figref{fig:objconstraints}. The two classes of variable, object
+and state variables, have no particular significance other than clarifying
+their roles during solving.
+
+The output from the structural subtyping constraint solver should contain
+a set of equality and subtyping constraints that concern object types.
+TODO: describe normalisation of object constraints.
+
+Given a conjunction of such normalised
 constraints $C_\omega$, solving proceeds by application of the rules in
-\figref{fig:objsolving}. Where there is no
-explicit partial or fixed solution for a given object variable $\omega$ in
-a constraint set, the solution for the object is equivalent to an empty partial solution, $\mathbf{partial}\:\emptyset$.
+\figref{fig:objsolving}.
+
+\begin{itemize}
+
+\item $\textsc{=-solve}$ ``connects'' two existing solutions in order to
+produce a single solution, which is as minimal as possible. $connect()$ is
+a variant of state machine union where the initial and final states are
+unknown. Some examples are shown in \figref{fig:connect_ex}
+
+\end{itemize}
 
 \begin{figure}
 \[
@@ -1323,6 +1409,52 @@ a constraint set, the solution for the object is equivalent to an empty partial 
 \end{figure}
 
 \begin{figure*}
+\includegraphics[width=\textwidth]{connect_ex1.pdf}
+\caption{\label{fig:connect_ex} Examples of connecting solutions}
+\end{figure*}
+
+% \begin{figure}
+% \begin{center}
+% \begin{tabular}{c}
+% \infer[\textsc{eq\_norm}]
+% 	{
+% 	\substo{\omega@\sigma}{\alpha}{C}
+% 	}
+% 	{
+% 	C \cand \alpha = \omega@\sigma
+% 	}
+% \\\\
+% \infer[\textsc{sub\_norm\_1}]
+% 	{
+% 	\substo{\omega_2@\sigma_2}{\alpha}{C}
+% 	}
+% 	{
+% 	C \cand \alpha <: \omega@\sigma
+% 	&
+% 	\fresh{\omega_2}
+% 	&
+% 	\fresh{\sigma_2}
+% 	}
+% \\\\
+% \infer[\textsc{sub\_norm\_2}]
+% 	{
+% 	\substo{\omega_2@\sigma_2}{\alpha}{C}
+% 	}
+% 	{
+% 	C \cand \omega@\sigma <: \alpha
+% 	&
+% 	\fresh{\omega_2}
+% 	&
+% 	\fresh{\sigma_2}
+% 	}
+% \\\\
+% \infer[\textsc{join\_}]
+% \end{tabular}
+% \end{center}
+% \caption{\label{fig:objnorm} Object constraint normalisation rules}
+% \end{figure}
+
+\begin{figure*}
 
 \begin{center}
 \begin{tabular}{cc}
@@ -1332,21 +1464,20 @@ a constraint set, the solution for the object is equivalent to an empty partial 
 	\substo{\omega}{\omega_1}{
 	\substo{\omega}{\omega_2}{
 	\substo{\sigma}{\sigma_1}{
-	\substo{\sigma}{\sigma_2}{C}}}}, \,
-	\omega = \Omega, \,
+	\substo{\sigma}{\sigma_2}{C}}}} \cand
+	\omega = \Omega \cand
 	\sigma = \Sigma
 }
 {
 	\begin{array}{c}
-	C, \, 
-	\os{1}{1} = \os{2}{2}, \,
-	\omega_1 = \Omega_1, \,
-	\omega_2 = \Omega_2, \,
-	\sigma_1 = \Sigma_1, \,
+	C \cand 
+	\os{1}{1} = \os{2}{2} \cand
+	\omega_1 = \Omega_1 \cand
+	\omega_2 = \Omega_2 \cand
+	\sigma_1 = \Sigma_1 \cand
 	\sigma_2 = \Sigma_2
 	\\
-	\sigma = min(\sigma_1, \sigma_2) 
-	\\
+	\sigma = min(\sigma_1, \sigma_2) \:\:\:
 	\omega = min(\omega_1, \omega_2) 
 	\\
 	(\Omega, \Sigma) = \mathbf{connect}(\Omega_1, \Sigma_1, \Omega_2, \Sigma_2)
@@ -1358,24 +1489,26 @@ a constraint set, the solution for the object is equivalent to an empty partial 
 
 \infer[\textsc{remap-solve}]
 {
-	C, \,
-	\omega_1 = \partialo{}{'}, \,
-	\sigma_1 = \overline{S}_{out}, \,
+	C \cand
+	\omega_1 = \partialo{}{'} \cand
+	\sigma_1 = \overline{S}_{out} \cand
 	\sigma_2 = \overline{S}_{in}
 }
 {
 	\begin{array}{c}
-	C, \,
-	\os{1}{1} = \remapapp{\os{1}{2}}{\os{2}{3}}{\os{2}{4}}, \,
-	\omega_1 = \partialo{1}{}, \,
-	\sigma_1 = \Sigma_1, \,
+	C \cand
+	\os{1}{1} = \remapapp{\os{1}{2}}{\os{2}{3}}{\os{2}{4}} \cand
+	\omega_1 = \partialo{1}{} \cand
+	\sigma_1 = \Sigma_1 \cand
 	\sigma_2 = \Sigma_2
 	\\
-	\omega_2 = \fixedo{2}{} \in C
-	\\
-	\sigma_3 = \overline{S}_3 \in C
-	\\
-	\sigma_4 = \overline{S}_4 \in C
+		\begin{array}{ccc}
+		\omega_2 = \fixedo{2}{} \in C
+		&
+		\sigma_3 = \overline{S}_3 \in C
+		&
+		\sigma_4 = \overline{S}_4 \in C
+		\end{array}
 	\\
 	(\mathbb{S}, \overline{S}_{in}, E) = \mathbf{refine}(\mathbb{S}_1, \Sigma_2, \mathbb{S}_2, \overline{S_3})
 	\\
@@ -1388,20 +1521,22 @@ a constraint set, the solution for the object is equivalent to an empty partial 
 
 \infer[\textsc{$<:$-solve}]
 {
-	C, \,
-	\omega_1 = \mathbb{S}', \,
-	\sigma_1 = \overline{S}' \,
+	C \cand
+	\omega_1 = \mathbb{S}' \cand
+	\sigma_1 = \overline{S}' \cand
 }
 {
 	\begin{array}{c}
-	C, \,
-	\os{1}{1} <: \os{2}{2}, \,
-	\omega_1 = \partialo{1}{}, \,
+	C \cand
+	\os{1}{1} <: \os{2}{2} \cand
+	\omega_1 = \partialo{1}{} \cand
 	\sigma_1 = \Sigma_1
 	\\
+	\begin{array}{cc}
 	\omega_2 = \fixedo{2}{} \in C
-	\\
+	&
 	\sigma_2 = \overline{S}_2 \in C
+	\end{array}
 	\\
 	(\mathbb{S}', \overline{S}', E) = \mathbf{overlay}(\mathbb{S}_1, \Sigma_1, \mathbb{S}_2, \overline{S}_2)
 	\end{array}
@@ -1418,18 +1553,20 @@ a constraint set, the solution for the object is equivalent to an empty partial 
 }
 {
 	\begin{array}{c}
-	C, \,
-	\os{1}{1} = \os{2}{2} \sqcup \os{3}{3} \,
-	\omega_1 = \Omega_1,
+	C \cand
+	\os{1}{1} = \os{2}{2} \sqcup \os{3}{3} \cand
+	\omega_1 = \Omega_1 \cand
 	\sigma_1 = \Sigma_1
 	\\
+	\begin{array}{cccc}
 	\omega_2 = \fixedo{2} \in C
-	\\
+	&
 	\omega_3 = \fixedo{3} \in C
-	\\
+	&
 	\sigma_2 = \overline{S}_2 \in C
-	\\
+	&
 	\sigma_3 = \overline{S}_3 \in C
+	\end{array}
 	\\
 	(\mathbb{S}_\cup, \overline{S}'_\cup) = \mathbf{union}(\mathbb{S}_2, \overline{S}_2, \mathbb{S}_3, \overline{S}_3)
 	\\
@@ -1448,14 +1585,16 @@ a constraint set, the solution for the object is equivalent to an empty partial 
 }
 {
 	\begin{array}{c}
-	C, \,
-	\os{1}{1} = \os{1}{2} \veebar \os{1}{3}, \,
-	\omega_1 = \Omega_1,
+	C \cand
+	\os{1}{1} = \os{1}{2} \veebar \os{1}{3} \cand
+	\omega_1 = \Omega_1 \cand
 	\sigma_1 = \Sigma_1
 	\\
+	\begin{array}{cc}
 	\sigma_2 = \overline{S}_2 \in C
-	\\
+	&
 	\sigma_3 = \overline{S}_3 \in C
+	\end{array}
 	\\
 	(\Omega, \Sigma) = \mathbf{connect}(\Omega_1, \Sigma_1, \fixedo{2}{}, \overline{S}_2 \cup \overline{S}_3)
 	\end{array}
@@ -2167,6 +2306,7 @@ $\typerule{\substxy{\Gamma}}{\substxy{\ift{t_c}{t_t}{t_f}}}{T}{\substxy{\Gamma'}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Context constraint normalisation}
+\label{app:ctx_norm}
 
 For the purposes of the following proofs, existential quantification of
 context variables will be omitted. We shall assume that all introduced
@@ -2220,7 +2360,7 @@ $\forall \gamma \in C, dom(\gamma, C) \subseteq dom(\gamma, C')$
 \item Root relationships do not change: 
 $\forall \gamma_a, \gamma_b \in C, root(\gamma_a, C) = root(\gamma_b, C) \implies root(\gamma_a, C') = root(\gamma_b, C')$.
 \item The domains of related contexts change consistently:
-$\forall \gamma_a, \gamma_b \in C, root(\gamma_a, C) = root(\gamma_b, C) \cand dom(\gamma_a, C) = dom(\gamma_b, C) \implies dom(\gamma_a, C') = dom(\gamma_b, C')$.
+$\forall \gamma_a, \gamma_b \in C, root(\gamma_a, C) = root(\gamma_b, C) \cand dom(\gamma_a, C) = dom(\gamma_b, C) + \overline{x_i} \implies dom(\gamma_a, C') = dom(\gamma_b, C') + \overline{x_i}$.
 \end{itemize}
 
 $C \leq C'$ is a partial order.
@@ -2235,7 +2375,7 @@ $C \leq C'$ is a partial order.
 \label{thm:ctx_norm}
 Let $t$ be an arbitrary term. Let $C_t = ctx(\inferlhs{t})$.
 Given a normalised constraint $C$ where $\gamma \in C$ and $\gamma' \notin C$,
-$C \cand C_t$ is normalisable. Where an error does not occur, the normalised
+$C \cand C_t$ is normalisable. Where an error is not generated, the normalised
 output $C'$ will have the following properties:
 
 \begin{enumerate}
@@ -2251,40 +2391,42 @@ By induction on the structure of t.
 
 \begin{itemize}
 \item $t = unit$. It follows that 
-$C_t \triangleq \gamma' = \gamma$. 
-By \lemref{lem:norm_eq}, $C \cand \gamma' = \gamma$ is normalisable, with
-normalised output $C'$ which has all the required properties.
+$C_t \coloneqq \gamma' = \gamma$. 
+By \lemref{lem:norm_eq}, $C \cand \gamma' = \gamma$ is normalisable.
+If no error is generated, then the normalised output $C'$ has all the required 
+properties.
 
 \item $t = true$. Same as $t = unit$.
 
 \item $t = false$. Same as $t = unit$. 
 
-\item $t = \left[ \overline{ S_i \{ \overline{m_ij = (v_ij, S_ij)} \} }  \right]$.
-It follows that 
-$C_t \triangleq 
+\item $t = \left[ \overline{ S_i \{ \overline{m_{ij} = (v_{ij}, S_{ij})} \} }  \right]@S$.
+It follows that \\
+$C_t \coloneqq 
 \gamma' = \gamma \cand
 \overline{\gamma_{ij} = \emptyset} \cand
-\overline{\inferrule{\gamma_{ij}}{v_ij}{\alpha_ij}{\gamma_{ij}'}}.
+\overline{\inferrule{\gamma_{ij}}{v_{ij}}{\alpha_{ij}}{\gamma_{ij}'}}.
 $.
 
 By \lemref{lem:norm_eq} the constraint $C \cand \gamma' = \gamma$ is
-normalisable, with normalised output $C_2$ such that $C \leq C_2$ with
+normalisable. If no error is generated, the normalised output $C_2$ will be such that $C \leq C_2$ with
 $dom(\gamma, C_2) = dom(\gamma', C_2)$ and $root(\gamma, C_2) = root(\gamma', C_2)$.
 
 Let $C_3 = C_2 \cand \overline{\gamma_{ij} = \emptyset}$. 
 $C_3$ is normalised by definition, with $C_2 \leq C_3$.
 
 By repeated application of the induction hypothesis, the constraint
-$C_3 \cand \overline{\inferrule{\gamma_{ij}}{v_ij}{\alpha_ij}{\gamma_{ij}'}}$
+$C_3 \cand \overline{\inferrule{\gamma_{ij}}{v_{ij}}{\alpha_{ij}}{\gamma_{ij}'}}$
 is normalisable. If no error is generated, the normalised output $C_4$ will be such that $C_3 \leq C_4$. Transitively, $C \leq C_4$, and the domains and roots
 of $\gamma$ and $\gamma'$ will still be such that $dom(\gamma, C_4) = dom(\gamma', C_4)$ and $root(\gamma, C_4) = root(\gamma', C_4)$.
 
-\item $t = \\(\overline{x_i : T_i \gg T_i'}).t'$. 
+\item $t = \lambda(\overline{x_i : T_i \gg T_i'}).t'$. 
 It follows that 
-$C_t \triangleq 
-\gamma' = \gamma \cand \gamma_r = \emptyset \cand 
-\gamma_in = \gamma_r, \overline{x_i : \alpha_i} \cand
-\overline{x_i : \alpha_i' \in \gamma_out} \cand ctx(\inferrule{\gamma_{in}}{t'}{\alpha'}{\gamma_{out}})$.
+$C_t \coloneqq 
+\gamma' = \gamma \cand \\
+\gamma_r = \emptyset \cand \gamma_{in} = \gamma_r, \overline{x_i : \alpha_i} \cand
+\overline{x_i : \alpha_i' \in \gamma_{out}} \cand \\
+ctx(\inferrule{\gamma_{in}}{t'}{\alpha'}{\gamma_{out}})$.
 
 By \lemref{lem:norm_eq}, the constraint $C \cand \gamma' = \gamma$
 is normalisable. If no error is generated, the normalised output $C_2$ will be such that $C \leq C_2$ with $dom(\gamma, C_2) = dom(\gamma', C_2)$ and
@@ -2294,12 +2436,12 @@ Let $C_3$ be the constraint
 $C_2 \cand \gamma_r = \emptyset \cand \gamma_{in} = \gamma_r, \overline{x_i : \alpha_i}$.
 $C_3$ is normalised by definition, with $C_2 \leq C_3$.
 
-The constraint $C_3 \cand \inferrule{\gamma_{in}}{t'}{\alpha}{\gamma_{out}}$
+The constraint $C_3 \cand ctx(\inferrule{\gamma_{in}}{t'}{\alpha}{\gamma_{out}})$
 is normalisable by induction. Let $C_4$ be the normalised output, where
 $C_3 \leq C_4$.
 
 Let $C_5$ be the constraint 
-$C_4 \cand \overline{x_i : \alpha_i' \in \gamma_out}$.
+$C_4 \cand \overline{x_i : \alpha_i' \in \gamma_{out}}$.
 This constraint is normalisable by repeated application of 
 \lemref{lem:norm_usage}. If no error is generated, the normalised constraint 
 $C_5$ will be produced, where $C_4 \leq C_5$.
@@ -2309,9 +2451,9 @@ $dom(\gamma, C_5) = dom(\gamma', C_5)$ and
 $root(\gamma, C_5) = root(\gamma', C_5)$.
 
 \item $t = \lett{x}{t'}{t''}$.
-It follows that 
-$C_t \triangleq \gamma_{in} = \gamma_v, x : \alpha' \cand 
-\gamma' = \gamma_{out} - \{x\} \cand
+It follows that \\
+$C_t \coloneqq \gamma_{in} = \gamma_v, x : \alpha' \cand 
+\gamma' = \gamma_{out} - \{x\} \cand \\
 ctx(\inferrule{\gamma}{t'}{\alpha'}{\gamma_v}) \cand
 ctx(\inferrule{\gamma_{in}}{t''}{\alpha}{\gamma_{out}})$.
 
@@ -2324,7 +2466,7 @@ $root(\gamma, C_2) = root(\gamma_v, C_2)$.
 The constraint $C_2 \cand \gamma_{in} = \gamma_v, x : \alpha'$ is
 normalisable by \lemref{lem:norm_ext}. If no error is generated, the
 normalised output $C_3$ will be such that $C_2 \leq C_3$ with 
-$dom(\gamma_{in}, C_3) = dom(\gamma_v, C_2) + \{ x \}$.
+$dom(\gamma_{in}, C_3) = dom(\gamma_v, C_3) + \{ x \}$.
 
 By induction, the constraint
 $C_3 \cand ctx(\inferrule{\gamma_{in}}{t''}{\alpha}{\gamma_{out}})$
@@ -2343,16 +2485,12 @@ $\gamma_r = root(\gamma_{out}, C_4)$, and
 $\overline{x_i} = dom(\gamma_{out}, C_4)$. $C_5$ is normalised by definition,
 with $C_4 \leq C_5$.
 
-Transitively, $C \leq C_5$.
-
-% relate dom(\gamma) and dom(\gamma')
-% we currently preserve equality relationships between domains,
-% can we preserve equality plus variable set?
-
+As $C_3 \leq C_5$, it can be observed that $dom(\gamma_{in}, C_5) = dom(\gamma_v, C_5) + \{x\}$ (as this relationship holds for $C_3$) and that 
+$dom(\gamma_{in}, C_5) = dom(\gamma_{out}, C_5)$. Therefore, $dom(\gamma') = dom(\gamma_{out}, C_5) - \{x\} = dom(\gamma)$. Additionally, $root(\gamma, C_5) = root(\gamma', C_5)$ and transitively, $C \leq C_5$.
 
 \item $t = t' ; t''$.
 It follows that
-$C_t \triangleq 
+$C_t \coloneqq 
 ctx(\inferrule{\gamma}{t'}{\alpha'}{\gamma''}) \cand
 ctx(\inferrule{\gamma''}{t''}{\alpha}{\gamma'})$.
 
@@ -2375,7 +2513,7 @@ $root(\gamma, C_3) = root(\gamma', C_3)$. Transitively, $C \leq C_3$.
 
 \item $t = x(\overline{x_i})$.
 It follows that
-$C_t \triangleq \overline{x_i : \alpha_i \in \gamma} \cand 
+$C_t \coloneqq \overline{x_i : \alpha_i \in \gamma} \cand 
 x : \tinf_x \cand
 \gamma' = \gamma[\overline{x_i \mapsto \tinf_i}]
 $.
@@ -2394,7 +2532,7 @@ $dom(\gamma, C_4) = dom(\gamma', C_4)$ and $root(\gamma, C_4) = root(\gamma', C_
 
 \item $t = x.m$.
 It follows that
-$C_t \triangleq x : \alpha_o@\alpha_s \in \gamma \cand
+$C_t \coloneqq x : \alpha_o@\alpha_s \in \gamma \cand
 \gamma' = \gamma[x \mapsto \alpha_x]
 $.
 
@@ -2408,7 +2546,7 @@ $dom(\gamma', C_3) = dom(\gamma, C_3)$ and $root(\gamma', C_3) = root(\gamma, C_
 
 \item $t = \ift{t_c}{t_t}{t_f}$.
 It follows that
-$C_t \triangleq
+$C_t \coloneqq
 ctx(\inferrule{\gamma}{t_c}{\alpha_c}{\gamma_c}) \cand
 ctx(\inferrule{\gamma_c}{t_t}{\alpha_t}{\gamma_t}) \cand
 ctx(\inferrule{\gamma_c}{t_f}{\alpha_f}{\gamma_f}) \cand
@@ -2439,7 +2577,7 @@ as are their roots.
 
 It follows by rule $\textsc{c\_join}$ that the constraint
 $C_4 \cand \gamma' = \gamma_t \sqcup \gamma_f$ can be transformed to
-$C_5 = C_4 \cand \gamma' = \gamma_r, \overline{x_i : T_i} \cand \overline{T_i = T_t \veeq T_f}$ 
+$C_5 = C_4 \cand \gamma' = \gamma_r, \overline{x_i : T_i} \cand \overline{T_i = T_t \veebar T_f}$ 
 where $\overline{x_i} = dom(\gamma, C_4)$. Therefore $dom(\gamma, C_4) = dom(\gamma', C_4)$ and $root(\gamma, C_4) = root(\gamma', C_4)$. Trivially, $C_4 \leq C_5$ and transitively $C \leq C_5$.
 
 \end{itemize}
@@ -2526,7 +2664,8 @@ $C'' = C \cand \gamma' = \gamma_r, \overline{x_i : \tinf_i}, \overline{x_j : \ti
 $C''$ is therefore normalised, with all the required properties.
 
 If $\overline{x_i} \cap \overline{x_j} \neq \emptyset$, then by rule
-$\textsc{c\_ext\_2}$ a $\mathbf{bound}\:x$ error will be generated.
+$\textsc{c\_ext\_2}$ a $\mathbf{bound}\:x$ error will be generated, for
+some $x$.
 \end{enumerate}
 \end{proof}
 
@@ -2563,7 +2702,7 @@ $C_2 = C \cand \gamma' = \gamma[x \mapsto \tinf] \cand x : \alpha \in \gamma$.
 By \lemref{lem:norm_usage}, the constraint $C \cand x : \alpha \in \gamma$ is 
 normalisable. If no
 error is generated, the normalised constraint $C_3$ will be produced such
-that $C \leq C_3$ and $x \in dom(\gamma, C_3$. Therefore, by the 
+that $C \leq C_3$ and $x \in dom(\gamma, C_3)$. Therefore, by the 
 reasoning of case 3 below, $C_3 \cand \gamma' = \gamma[x \mapsto \tinf]$ is 
 normalisable. If no error is generated, the normalised constraint $C''$ will 
 be generated with all the required properties.
@@ -2604,8 +2743,8 @@ which is normalised and has all the required properties.
 \label{lem:norm_usage}
 Given a normalised constraint $C$ where $\gamma \in C$, the constraint 
 $C \cand x : \tinf \in \gamma$ is normalisable. When an error is not generated, 
-the constraint $C_2$ will be generated such that $C \leq C_2$ and
-$x \in dom(\gamma, C_2)$.
+the constraint $C'$ will be generated such that $C \leq C'$ and
+$x \in dom(\gamma, C')$.
 \end{lem}
 \begin{proof}
 
