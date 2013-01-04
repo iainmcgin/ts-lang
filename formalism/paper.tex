@@ -1765,16 +1765,21 @@ which we believe makes the approach intuitive.
 
 \begin{thm}[Progress and Preservation]
 \label{thm:soundness}
-Given a term $t$ such that $\typerule{\Gamma}{t}{T}{\Gamma'}$
-with a store $\mu$ such that $\Gamma \vdash \mu$, either $t$ is a value or 
-there exists a $t'$ and $\mu'$ such that
-$\oprule{t}{\mu}{t'}{\mu'}$, with some $\Gamma''$ such that
-$\Gamma'' \vdash \mu'$ and $\typerule{\Gamma''}{t'}{T}{\Gamma'}$.
+Given a non-value term $t$ such that $\typerule{\Gamma}{t}{T}{\Gamma'}$
+and a store $\mu$ such that $\Gamma \vdash \mu$, then:
+
+\begin{itemize}
+\item there exists a $t'$ and $\mu'$ such that
+$\oprule{t}{\mu}{t'}{\mu'}$
+\item there exists a $\Gamma''$ such that
+$\Gamma'' \vdash \mu'$ and $\typerule{\Gamma''}{t'}{T}{\Gamma'}$
+\end{itemize}
 \end{thm}
 
 \begin{proof}
-by induction on the typing derivation of $t$. Assume $t$ is not a value. It has
-therefore been typed by one of the following rules:
+by induction on the typing derivation of $t$. As $t$ is not a value,
+$\typerule{\Gamma}{t}{T}{\Gamma'}$ must have been derived by one of the
+following rules:
 
 \begin{itemize}
 \item \tlet. It follows that $t = \lett{x}{t_v}{t_b}$, with
@@ -1786,7 +1791,7 @@ There are two cases to consider:
   \begin{itemize}
   \item $t_v$ is a value.
   Reduction can occur by \rletv such that 
-  $\oprule{\lett{x}{t_v}{t_b}}{\mu}{t_b}{\mu [ x \mapsto t_v ]}$.
+  $\oprule{t}{\mu}{t_b}{\mu [ x \mapsto t_v ]}$.
   Let $\mu' = \mu [ x \mapsto t_v ]$. Let $\Gamma'' = \Gamma_1, x : T_v$.
   It follows that $\Gamma'' \vdash \mu'$ and by rule \tdrop that
   $\typerule{\Gamma''}{t_b}{T}{\Gamma'}$.
@@ -1807,7 +1812,7 @@ $\typerule{\Gamma_{mid}}{t_r}{T}{\Gamma'}$ for some $\Gamma_{mid}$ and $T_l$.
 There are two cases to consider:
 
   \begin{itemize}
-  \item $t_l$ is a value. Reduction can therefore occur by
+  \item $t_l$ is a value. Reduction can therefore occur by \\
   \rseqlv such that
   $\oprule{t_l ; t_r}{\mu}{t_r}{\mu}$. 
   Let $\Gamma'' = \Gamma_{mid}$, and $\mu' = \mu$.
@@ -2492,6 +2497,8 @@ $U' <: U$.
 	$\typerule{\Gamma, x : T'}{t}{U}{\Gamma', x : V'}$.
 
 	\end{itemize}
+
+\end{itemize}
 
 \end{proof}
 
