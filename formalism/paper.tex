@@ -98,6 +98,11 @@
 \newcommand{\fixedo}[2]{\mathbf{fixed}\:\overline{\mathbb{S}_{#1}{#2}}}
 \newcommand{\os}[2]{\omega_{#1}@\sigma_{#2}}
 
+\newcommand{\pathrefl}{$\lesssim${\sc-refl}}
+\newcommand{\pathadj}{$\lesssim${\sc-adj}}
+\newcommand{\pathtrans}{$\lesssim${\sc-trans}}
+\newcommand{\pathbranch}{$\lesssim${\sc-branch}}
+
 \newcommand{\tinf}{\mathbb{T}}
 
 \newcommand{\qed}{$\blacksquare$}
@@ -788,7 +793,7 @@ is given in \figref{fig:simreach}.
 	
 \end{array}
 \]
-\caption{\label{fig:simreach} Definition of the simulation predecessor relation}
+\caption{\label{fig:simreach} Definition of the path relation}
 \end{figure}
 
 The type system of TS defines a partial function named {\it remap}, 
@@ -2032,13 +2037,18 @@ $dom(\Gamma') = dom(\Gamma)$. Trivially, $dom(\Gamma') \subseteq dom(\Gamma)$.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:unused %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% last revised and checked: 2013/01/04
 
 \begin{lem}
 \label{lem:unused}
 Given an arbitrary term $t$ such that 
-$\typerule{\Gamma, x : T}{t}{T}{\Gamma', x : V}$ where $x$ is unused in
+$\typerule{\Gamma, x : T}{t}{U}{\Gamma', x : V}$ where $x$ is unused in
 $t$, $T <: V$.
 \end{lem}
+
+\begin{proof}
+Straightforward observation from the typing rules.
+\end{proof}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2143,6 +2153,7 @@ $\overline{S_4} = \bigcup \{ \overline{S} \mid (\ot{O_2}{S_2}, \ot{O_1}{S_1}) \l
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:remapcv %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% revised and checked 2013/01/04
 
 \begin{lem}[Remap is covariant]
 \label{lem:remapcv}
@@ -2157,51 +2168,37 @@ by case analysis of type $U$.
 \item $U = \boolt$ or $\unitt$. By \remapunit or \remapbool, it follows
 that $T = \remapapp{T}{U}{V}$. 
 As $\boolt$ and $\unitt$ have no subtypes other than
-themselves, it follows that $T' = T$. Trivially,
-$\remapapp{T'}{U}{V} = \remapapp{T}{U}{V}$.
+themselves, it follows that $T' = T$. By \subrefl,
+$\remapapp{T'}{U}{V} <: \remapapp{T}{U}{V}$.
 
 \item $U = \funt{U_i}{U_i'}{U'}$. By \remapfunc it follows that
-$\remapapp{T'}{U}{V} = T' <: T = \remapapp{T}{U}{V}$.
+$\remapapp{T'}{U}{V} = T'$ and $\remapapp{T}{U}{V} = T$, therefore
+$\remapapp{T'}{U}{V} <: \remapapp{T}{U}{V}$.
 
-\item $U = \ot{O_2}{S_2}$, with $T = \ot{O_1}{S_1}$ and $V = \ot{O_2}{S_4}$
-and $\ot{O_1}{S_3} = \remapapp{T}{U}{V}$. Let $T' = \ot{O_3}{S_5}$,
-and $\ot{O_3}{S_6} = \remapapp{T'}{U}{V}$. By definition,
-$\overline{S_3} = \bigcup \{ \overline{S} \mid (\ot{O_1}{S_1}, \ot{O_2}{S_2}) \lesssim (\ot{O_1}{S}, \ot{O_2}{S_4}) \}$, and
-$\overline{S_6} = \bigcup \{ \overline{S'} \mid (\ot{O_3}{S_5}, \ot{O_2}{S_2}) \lesssim (\ot{O_3}{S}, \ot{O_2}{S_4}) \}$.
+\item $U = \ot{O_1}{S_1}$. By \remapobj it follows that 
+$V = \ot{O_1}{S_2}$ and
+$T = \ot{O_2}{S_3}$ with
+$\remapapp{T}{U}{V} = \ot{O_2}{S_4}$. Similarly,
+$T' = \ot{O_3}{S_5}$
+with $\remapapp{T'}{U}{V} = \ot{O_3}{S_6}$. 
+
+By definition,
+$\overline{S_4} = \bigcup \{ \overline{S} \mid (\ot{O_2}{S_3}, \ot{O_1}{S_1}) \lesssim (\ot{O_2}{S}, \ot{O_1}{S_2}) \}$, and
+$\overline{S_6} = \bigcup \{ \overline{S'} \mid (\ot{O_3}{S_5}, \ot{O_1}{S_1}) \lesssim (\ot{O_3}{S'}, \ot{O_1}{S_2}) \}$.
 In both cases, each $\overline{S}$ and $\overline{S'}$ extracted from
 the path relation must be such that 
-$(\ot{O_3}{S_5}, \ot{O_1}{S_1}) \lesssim (\ot{O_3}{S'}, \ot{O_1}{S})$.
-Therefore, $\ot{O_3}{S_6} <: \ot{O_1}{S_3}$.
+$(\ot{O_3}{S_5}, \ot{O_2}{S_3}) \lesssim (\ot{O_3}{S'}, \ot{O_2}{S})$
+as $T' <: T$.
+Therefore, $\ot{O_3}{S_6} <: \ot{O_2}{S_4}$.
 
 \end{itemize}
 \end{proof}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:remap_in_contra %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-\begin{lem}
-\label{lem:remap_in_contra}
-Given types $T, U, U'$ and $V$ such that $U' <: U$ and that
-both $\remapapp{T}{U'}{V}$ and $\remapapp{T}{U}{V}$ are defined,
-$\remapapp{T}{U}{V} <: \remapapp{T}{U'}{V}$.
-\end{lem}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:remap_out_cv %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{lem}
-\label{lem:remap_out_cv}
-Given types $T, U, V$ and $V'$ such that $V' <: V$ and that
-both $\remapapp{T}{U}{V}$ and $\remapapp{T}{U}{V'}$ are defined,
-$\remapapp{T}{U}{V'} <: \remapapp{T}{U}{V}$.
-\end{lem}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:lesssim_same %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% revised and checked: 2013/01/04
+
 
 \begin{lem}
 \label{lem:lesssim_same}
@@ -2211,12 +2208,42 @@ that $\overline{S'} = \overline{S''}$.
 \end{lem}
 
 \begin{proof}
-TODO (coinductive?)
+by induction on the path relation. Assume 
+$(\ot{O}{S}, \ot{O}{S}) \lesssim (\ot{O}{S'}, \ot{O}{S''})$. It follows that
+this will have been derived by one of the following rules:
+
+\begin{itemize}
+
+\item \pathrefl. Directly, $\overline{S} = \overline{S'} = \overline{S''}$.
+
+\item \pathadj. It follows that there exists a method $m$ such that
+$m : T \Rightarrow \overline{S'} \in \ot{O}{S}$. There can be no other
+target state set for this method, therefore $\overline{S'} = \overline{S''}$.
+
+\item \pathtrans. It follows that there exists state sets $\overline{S_1}$
+and $\overline{S_2}$ such that
+$(\ot{O}{S}, \ot{O}{S}) \lesssim (\ot{O}{S_1}, \ot{O}{S_2})$ and
+$(\ot{O}{S_1}, \ot{O}{S_2}) \lesssim (\ot{O}{S'}, \ot{O}{S''})$. By induction,
+it follows that $\overline{S_1} = \overline{S_2}$. Therefore, also by induction,
+$\overline{S'} = \overline{S''}$.
+
+\item \pathbranch. It follows that there exists state sets
+$\overline{S_1}$, $\overline{S_2}$, $\overline{S_3}$, $\overline{S_4}$ such
+that 
+$(\ot{O}{S}, \ot{O}{S}) \lesssim (\ot{O}{S_1}, \ot{O}{S_2})$ and
+$(\ot{O}{S}, \ot{O}{S}) \lesssim (\ot{O}{S_3}, \ot{O}{S_4})$ where
+$\overline{S'} = \overline{S_1} \cup \overline{S_3}$ and
+$\overline{S''} = \overline{S_2} \cup \overline{S_4}$.
+By induction, $\overline{S_1} = \overline{S_2}$ and 
+$\overline{S_3} = \overline{S_4}$. Therefore, $\overline{S'} = \overline{S''}$.
+
+\end{itemize}
 \end{proof}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:remapsame %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% revised and checked: 2013/01/04
 
 \begin{lem}
 \label{lem:remapsame}
@@ -2236,15 +2263,19 @@ Directly by rule \remapunit or \remapbool, $T = \remapapp{T}{T}{T}$
 \item $T = \ot{O}{S_1}$. Let $\ot{O}{S_2} = \remapapp{T}{T}{T}$. By definition,
 $\overline{S_2} = \bigcup \{ \overline{S} \mid (\ot{O}{S_1}, \ot{O_1}{S_1}) \lesssim (\ot{O_1}{S}, \ot{O_1}{S_1}) \}$. By \lemref{lem:lesssim_same}, it follows that
 $\overline{S} = \overline{S_1}$ for all $\overline{S}$. Therefore,
-$\overline{S_2} = \overline{S_1}$.
+$\overline{S_2} = \overline{S_1}$, meaning
+$T = \remapapp{T}{T}{T}$.
 \end{itemize}
 \end{proof}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:remapsame %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% revised and checked 2013/01/04
 
 \begin{lem}
 \label{lem:remapeff}
-Given types $T$, $U$ and $V$ such that $U <: V$.
-It follows that $U <: \remapapp{U}{V}{V}$.
+Let $U <: V$. It follows that $U <: \remapapp{U}{V}{V}$.
 \end{lem}
 \begin{proof}
 By case analysis of the type $V$.
@@ -2627,6 +2658,7 @@ $\typerule{\Gamma, \Gamma''}{t}{T}{\Gamma', \Gamma''}$.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% lem:subst %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% revised and checked: 2013/01/05
 
 \begin{lem}[Substitution]
 \label{lem:subst}
@@ -2639,94 +2671,145 @@ $\typerule
 where each $x_i$ and $y_i$ is distinct, and $\overline{x_i} \cap \overline{y_i} = \emptyset$.
 \end{lem}
 \begin{proof}
-by induction on the structure of $t$.
-
-If $t$ is some value $v$, then $\Gamma = \Gamma'$, therefore
-$\subst{x_i}{y_i}{\Gamma} = \subst{x_i}{y_i}{\Gamma'}$
-and substitution has no effect on the value, which has no specific requirements
-of either $\Gamma$ or $\Gamma'$ other than that they are equal.
-Therefore, $\typerule{\subst{x_i}{y_i}{\Gamma}}{\subst{x_i}{y_i}{v}}{T}{\subst{x_i}{y_i}{\Gamma'}}$.
-
-If $t$ is a term, then it is of one of the following forms:
+by induction on the typing derivation of $t$. $\typerule{\Gamma}{t}{T}{\Gamma'}$
+must have been derived by one of the following rules:
 
 \begin{itemize}
-\item $t = \lett{x}{t''}{t'}$. 
+
+\item \tunit, \ttrue, \tfalse, \tobj or \tfundef. For each of these rules,
+$\Gamma = \Gamma'$. Therefore, $\subst{x_i}{y_i}{\Gamma} = \subst{x_i}{y_i}{\Gamma'}$.
+and substitution has no effect on the value. The rule used for derivation
+has no specific requirements of either $\Gamma$ or $\Gamma'$ other than that 
+they are equal.
+Therefore, $\typerule{\subst{x_i}{y_i}{\Gamma}}{\subst{x_i}{y_i}{v}}{T}{\subst{x_i}{y_i}{\Gamma'}}$.
+
+\item \tlet. It follows that $t = \lett{x}{t_v}{t_b}$. 
 Substitution is defined on this term such that \\
 $\subst{x_i}{y_i}{t} \equiv 
-\lett{x}{( \subst{x_i}{y_i}{t''} )}{(\subst{x_j}{y_j}{t'})}$
+\lett{x}{( \subst{x_i}{y_i}{t_v} )}{(\subst{x_j}{y_j}{t_b})}$
 , where $\overline{y_j} = \overline{y_i} - \{ x \}$.
 
 By rule \tlet, it follows
 that there exists $T', T'', \Gamma_1$ such that
-$\typerule{\Gamma}{t''}{T''}{\Gamma_1}$ and that
-$\typerule{\Gamma_1, x : T''}{t''}{T}{\Gamma', x : T'}$.
+$\typerule{\Gamma}{t_v}{T''}{\Gamma_1}$ and that
+$\typerule{\Gamma_1, x : T''}{t_b}{T}{\Gamma', x : T'}$.
 Additionally, $x \notin dom(\Gamma)$.
 
-By induction, $t''$ can be substituted such that 
+By induction, $t_v$ can be substituted such that 
 $\typerule
 {\subst{x_i}{y_i}{\Gamma}}
-{\subst{x_i}{y_i}{t''}}
+{\subst{x_i}{y_i}{t_v}}
 {\subst{x_i}{y_i}{\Gamma_1}}
 $.
-Additionally, $t'$ can be substituted such that
-$(\subst{x_j}{y_j}{\Gamma_1}) , x : T'' \triangleright \subst{x_j}{y_j}{t''} \triangleleft \{ (\overline{x_j / y_j} \} \Gamma') , x : T'$ as it is guaranteed that $x \notin \overline{y_j}$.
+Additionally, $t_b$ can be substituted such that
+$(\subst{x_j}{y_j}{\Gamma_1}) , x : T'' \triangleright \subst{x_j}{y_j}{t_b} \triangleleft \{ (\overline{x_j / y_j} \} \Gamma') , x : T'$ as it is guaranteed that $x \notin \overline{y_j}$.
 As $dom(\Gamma') = dom(\Gamma)$, and that $x \notin dom(\Gamma)$, it follows that $\subst{x_i}{y_i}{\Gamma_1} = (\subst{x_j}{y_j}{\Gamma_1})$ and
 that $\overline{x_i / y_i} \} \Gamma' = \overline{x_j / y_j} \} \Gamma'$.
 
 Therefore, the requirements of \tlet are satisfied such that
 $\typerule{\subst{x_i}{y_i}{\Gamma}}{\subst{x_i}{y_i}{t}}{T}{\subst{x_i}{y_i}{\Gamma'}}$.
 
-\item $t = t_l ; t_r$.
-Substitution is defined on this term such that
-$\{ \overline{x_i / y_i} \} ( t_l ; t_r ) \equiv \subst{x_i}{y_i}{t_l} ; \subst{x_i}{y_i}{t_r}$.
-
-By rule \tseq, there exists $\Gamma'', T'$ such that
+\item \tseq. It follows that $t = t_l ; t_r$,
+and there exists $\Gamma'', T'$ such that
 $\typerule{\Gamma}{t_l}{T'}{\Gamma''}$ and
-$\typerule{\Gamma''}{t_r}{T}{\Gamma'}$. By induction,
+$\typerule{\Gamma''}{t_r}{T}{\Gamma'}$.
+Substitution is defined on this term such that
+$\subst{x_i}{y_i}{(t_l ; t_r)} \equiv \subst{x_i}{y_i}{t_l} ; \subst{x_i}{y_i}{t_r}$.
+
+By induction, $t_l$ and $t_r$ can be typed such that
 $\typerule{\subst{x_i}{y_i}{\Gamma}}{\subst{x_i}{y_i}{t_l}}{T'}{\subst{x_i}{y_i}{\Gamma''}}$ and
 $\typerule{\subst{x_i}{y_i}{\Gamma''}}{\subst{x_i}{y_i}{t_r}}{T}{\subst{x_i}{y_i}{\Gamma'}}$.
-Therefore, $t$ can by typed \tseq after the substitution.
+Therefore, $t$ can by typed using \tseq such that
 
-\item $t = x_0 ( \overline{x_k} )$.
+$\typerule{\subst{x_i}{y_i}{\Gamma}}{\subst{x_i}{y_i}{t}}{T}{\subst{x_i}{y_i}{\Gamma'}}$.
+
+\item \tfunc. It follows that $t = z ( \overline{z_k} )$ and
+that $\Gamma = \Gamma_1, \overline{z_k : T_k}$,
+$\Gamma' = \Gamma_1, \overline{z_k : T_k'}$
+where $\Gamma_1(z) = \funt{U_k}{V_k}{T}$ with for each $k$,
+$T_k <: U_k$ and $T_k' = \remapapp{T_k}{U_k}{V_k}$. Each
+variable in $\overline{z_k} \cup \{ z \}$ is distinct.
+
+
 Substition is defined on this term such that
-$\subst{x_i}{y_i}{x_0} ( \overline{x_k} ) \equiv y_0 ( \overline{y_k} )$
-where for each $x \in \{ x_0, \overline{x_k} \}$,
-$x = y_j \implies y = x_j$, otherwise $y$ is the original value.
+$\subst{x_i}{y_i}{z ( \overline{z_k} )} \equiv z' ( \overline{z_k'} )$
+where $z' = z$ if $z \notin \overline{y_i}$ or $z = x_i$ for the $x_i$ such
+that $z = y_i$, and similarly for all $z_i$.
 
-For each substitution that occurs in the term, the variable must exist in
-both the input and output contexts by rule \tfunc, and will be substituted
-for the same name. Therefore, $t$ can be typed by \tfunc after the
-substitution.
+The uniqueness of each substitution pair ensures
+that no variable will be passed twice as part of the function call.
+Therefore, the conditions of \tfunc are satisfied such that
 
-\item $t = x.m$.
+$\typerule{\substxy{\Gamma}}{\substxy{t}}{T}{\substxy{\Gamma'}}$.
+
+\item \tmethc. It follows that $t = x.m$ with
+$\Gamma = \Gamma_1, x : \ot{O}{S}$ and
+$\Gamma' = \Gamma_1, x : \ot{O}{S'}$ such
+that $m : T \Rightarrow \overline{S'} \in \ot{O}{S}$.
+
 Substition is defined on this term such that
-$\subst{x_i}{y_i}{x.m} \equiv y.m$
-where $y = x_j$ if $x = y_j$ for some $y_j \in \overline{y_i}$.
-Otherwise, $y = x$.
+$\subst{x_i}{y_i}{x.m} \equiv z.m$
+where $z = x_j$ if $x = y_j$ for some $y_j \in \overline{y_i}$.
+Otherwise, $z = x$.
 
-Rule \tmethc requires that $x$ exist in both $\Gamma$ and $\Gamma'$ and
-therefore any substitution of x in the term will be matched with the
-same substitution in the contexts. Therefore, $t$ can be typed by
-\tmethc after the substitution.
+The conditions of \tmethc are satisfied such that
+$\typerule{\substxy{\Gamma}}{\substxy{t}}{T}{\substxy{\Gamma'}}$.
 
-\item $t = \ift{t_c}{t_t}{t_f}$. Substitution is defined on this term such
-that \\
-$\subst{x_i}{y_i}{(\ift{t_c}{t_t}{t_f})} \equiv 
-\ift{\substxy{t_c}}{\substxy{t_t}}{\substxy{t_f}}$.
-By rule \tif there exists $\Gamma_1$, $\Gamma_2$, $\Gamma_3$, $T_t$, $T_f$
+\item \tif. It follows that $t = \ift{t_c}{t_t}{t_f}$,
+where there exists $\Gamma_1$, $\Gamma_2$, $\Gamma_3$, $T_t$, $T_f$
 such that
 $\typerule{\Gamma}{t_c}{\boolt}{\Gamma_1}$ and that
 $\typerule{\Gamma_1}{t_t}{T_t}{\Gamma_2}$ and that
 $\typerule{\Gamma_1}{t_f}{T_f}{\Gamma_3}$ where
-$\Gamma' = \Gamma_2 \sqcup \Gamma_3$ and $T = T_t \sqcup T_f$. By induction
+$\Gamma' = \Gamma_2 \sqcup \Gamma_3$ and $T = T_t \sqcup T_f$.
+
+Substitution is defined on this term such
+that \\
+$\subst{x_i}{y_i}{(\ift{t_c}{t_t}{t_f})} \equiv 
+\ift{\substxy{t_c}}{\substxy{t_t}}{\substxy{t_f}}$.
+
+By induction
 substitution can be performed on $t_c$, $t_t$ and $t_f$ such that
 $\typerule{\substxy{\Gamma}}{\substxy{t_c}}{\boolt}{\substxy{\Gamma_1}}$ and that
 $\typerule{\substxy{\Gamma_1}}{\substxy{t_t}}{T_t}{\substxy{\Gamma_2}}$ and
 $\typerule{\substxy{\Gamma_1}}{\substxy{t_f}}{T_f}{\substxy{\Gamma_3}}$.
 By the definition of substitution on contexts, 
-$\substxy{\Gamma_2} \sqcup \substxy{\Gamma_3} = \substxy{\Gamma'}$. Therefore,
-by rule \tif, 
+$\substxy{\Gamma_2} \sqcup \substxy{\Gamma_3} = \substxy{\Gamma'}$. 
+
+The conditions of the rule \tif are satisfied such that
 $\typerule{\substxy{\Gamma}}{\substxy{\ift{t_c}{t_t}{t_f}}}{T}{\substxy{\Gamma'}}$.
+
+\item \tdrop. It follows that there exists a $\Gamma''$ such that
+$\typerule{\Gamma}{t}{T}{\Gamma', \Gamma''}$. By induction,
+$\typerule{\substxy{\Gamma}}{\substxy{t}}{T}{\substxy{\Gamma', \Gamma''}}$.
+By the definition of substitution on contexts,
+$\substxy{\Gamma', \Gamma''} = \substxy{\Gamma'}, \substxy{\Gamma''}$.
+
+Therefore by rule \tdrop,
+$\typerule{\substxy{\Gamma}}{\substxy{t}}{T}{\substxy{\Gamma'}}$.
+
+\item \tsub. It follows that
+$\typerule{\Gamma}{t}{T'}{\Gamma'}$ for some $T' <: T$. By induction,
+$\typerule{\substxy{\Gamma}}{\substxy{t}}{T'}{\substxy{\Gamma'}}$.
+By rule \tsub,
+$\typerule{\substxy{\Gamma}}{\substxy{t}}{T}{\substxy{\Gamma'}}$.
+
+\item \twiden. It follows that $\Gamma' = \Gamma_1, x : U$
+and there exists a $U' <: U$ such that
+$\typerule{\Gamma}{t}{T'}{\Gamma_1, x : U'}$. 
+By induction,
+$\typerule{\substxy{\Gamma}}{\substxy{t}}{T}{\substxy{\Gamma_1, x : U'}}$.
+By rule \twiden,
+$\typerule{\substxy{\Gamma}}{\substxy{t}}{T}{\substxy{\Gamma_1, x : U}}$.
+
+\item \tnarrow. It follows that $\Gamma = \Gamma_1, x : U'$
+and there exists a $U$ such that $U' <: U$ and
+$\typerule{\Gamma_1, x : U}{t}{T'}{\Gamma'}$.
+By induction,
+$\typerule{\substxy{\Gamma_1, x : U}}{\substxy{t}}{T}{\substxy{\Gamma'}}$.
+By rule \tnarrow,
+$\typerule{\substxy{\Gamma_1, x : U'}}{\substxy{t}}{T}{\substxy{\Gamma'}}$
+
 \end{itemize}
 \end{proof}
 
@@ -2869,53 +2952,69 @@ Trivially, the typing $(\emptyset, \unitt, \emptyset)$ is principal.
 Trivially, the typing $(\emptyset, \boolt, \emptyset)$ is principal.
 
 \item $t = \funv{x_i}{T_i}{U_i}{t'}$. 
-As $t$ is typeable, it must be the case that $t'$ is typeable also.
+As $t$ is typeable, it must be the case that $t'$ is typeable also. Trivially
+$t'$ will contain no function calls as it is part of $t$.
 By induction, the term $t'$ has a principal typing
-$(\Gamma, T, \Gamma')$. It follows that for each $i$, if $x_i \notin dom(\Gamma)$
+$(\Gamma, T, \Gamma')$. In order for $t$ to be typeable, it must be the case
+that $dom(\Gamma) \subseteq \overline{x_i}$ --- the function body cannot use
+any variables which are not explicitly passed as a parameter. 
+
+For each $i$, if $x_i \notin dom(\Gamma)$
 then $x_i$ is not used in $t'$. Let $\overline{x_j} \subseteq \overline{x_i}$
 be the set of such unused variables.
 Let $\Gamma_2 = \Gamma, \overline{x_j : \top}$ and 
 $\Gamma_2' = \Gamma', \overline{x_j : \top}$.
 By \lemref{lem:weakening}, $(\Gamma_2, T, \Gamma_2')$ is a typing of $t'$.
 
-If the effect $T_i \gg U_i$ is specified for parameter $x_i$ then it
-must be the case that $T_i <: \Gamma_2(x_i)$ for each $i$ so that 
-$t$ is typeable by rule \tfunc.
-Let $\Gamma_3 = \overline{x_i : T_i'}$ such that:
+The effect $T_i \gg U_i$ for parameter $x_i$ must be such that 
+$T_i <: \Gamma_2(x_i)$ and $\Gamma_2'(x_i) <: U_i$ in order for
+$t$ to be typeable. 
+Trivially, $(\emptyset, \funt{T_i}{U_i}{T}, \emptyset)$ is the principal
+typing of $T$.
 
-\begin{itemize}
-\item $T_i' = T_i$ if $T_i$ is specified
-\item $T_i' = \Gamma_2(x_i)$ otherwise.
-\end{itemize}
+It is worth noting that the explicit effects for each parameter are not
+actually necessary, and can be extracted directly from $\Gamma_2$
+and $\Gamma_2'$. By choosing $T_i' = \Gamma_2(x_i)$ and $U_i' = \Gamma_2'(x_i)$,
+$(\emptyset, \funt{T_i'}{U_i'}{T}, \emptyset)$ is a typing of the modified
+function value $\lambda (\overline{x_i}) . t'$, which can safely omit the
+effect types for each $x_i$.
 
-By repeated application of \lemref{lem:upgrade}, there exists a $\Gamma_3'$ and 
-$T'$ such that
-$(\Gamma_3,T',\Gamma_3')$ is a typing of $t'$, where $T' <: T$,
-$dom(\Gamma_3') = dom(\Gamma_2')$ and 
-$\forall x \in \Gamma_3' . \Gamma_3'(x) <: \Gamma_2'(x)$.
+%! extended proof of construction of principal types when some annotations
+%! provided, and some are missing
+%
+% so that 
+% $t$ is typeable by rule \tfunc.
+% Let $\Gamma_3 = \overline{x_i : T_i}$.
 
-Let $U_i' = U_i$ if $U_i$ is specified or $U_i' = \Gamma_3'(x)$ otherwise.
-It must be the case that $\Gamma_3'(x) <: U_i'$ for each $i$ so that
-$t$ is typeable by rule \tfunc.
-Let $\Gamma_4 = \overline{x_i : U_i}$.
-By repeated application of rule \twiden, 
-$(\Gamma_3,T',\Gamma_4)$ is a typing of $t'$.
+% By repeated application of \lemref{lem:upgrade}, there exists a $\Gamma_3'$ and 
+% $T'$ such that
+% $(\Gamma_3,T',\Gamma_3')$ is a typing of $t'$, where $T' <: T$,
+% $dom(\Gamma_3') = dom(\Gamma_2')$ and 
+% $\forall x \in \Gamma_3' . \Gamma_3'(x) <: \Gamma_2'(x)$.
 
-By rule \tfundef it follows that
-$\tau = (\emptyset, \funt{T_i'}{U_i'}{T'}, \emptyset)$ is a typing of $t$. 
-There can be no stronger typing than this, as $T_i'$ has an upper bound
-determined by either the principal typing of $t'$ or the user specified
-type $T_i$. Similarly, $U_i'$ has a lower bound determined by
-modification of the principal typing of $t'$ or the user specified
-$U_i$. Therefore $\tau$ is the principal type of $t$.
+% Let $U_i' = U_i$ if $U_i$ is specified or $U_i' = \Gamma_3'(x)$ otherwise.
+% It must be the case that $\Gamma_3'(x) <: U_i'$ for each $i$ so that
+% $t$ is typeable by rule \tfunc.
+% Let $\Gamma_4 = \overline{x_i : U_i}$.
+% By repeated application of rule \twiden, 
+% $(\Gamma_3,T',\Gamma_4)$ is a typing of $t'$.
+
+% By rule \tfundef it follows that
+% $\tau = (\emptyset, \funt{T_i'}{U_i'}{T'}, \emptyset)$ is a typing of $t$. 
+% There can be no stronger typing than this, as $T_i'$ has an upper bound
+% determined by either the principal typing of $t'$ or the user specified
+% type $T_i$. Similarly, $U_i'$ has a lower bound determined by
+% modification of the principal typing of $t'$ or the user specified
+% $U_i$. Therefore $\tau$ is the principal type of $t$.
 
 \item $t = \left[ \overline{S_i \{ \overline{ m_{ij} = (v_{ij},S_{ij}') } \} } \right]@S$.
 As $t$ is typeable, each $v_{ij}$ must be typeable also.
-By induction, each $v_{ij}$ has a principal typing $(\emptyset, T_{ij}, \emptyset)$,
-as values can be typed with arbitrary input contexts, and principal typings
-have the smallest input context domain possible.
+By induction, each $v_{ij}$ has a principal typing, which will be of
+form $(\emptyset, T_{ij}, \emptyset)$
+as values can be typed with no requirements on the input context.
 
-Trivially, $\tau = (\emptyset,\{ \overline{ S_i \{ \overline{ m_{ij} = T_{ij} \Rightarrow S_ij } \} } \}@S,\emptyset)$ is
+Directly, 
+$\tau = (\emptyset,\{ \overline{ S_i \{ \overline{ m_{ij} = T_{ij} \Rightarrow S_ij } \} } \}@S,\emptyset)$ is
 the principal typing of $t$.
 
 \item $t = \lett{x}{t_v}{t_b}$.
@@ -2929,16 +3028,17 @@ $x \notin dom(\Gamma_v)$.
 Let $\Gamma_b'' = \Gamma_b - \{x\}$ and
 $\Gamma_b''' = \Gamma_b' - \{x\}$.
 
-Let $(\Gamma_{in}, \Gamma_{mid}, \Gamma_{out}) = seqctx(\Gamma_v, \Gamma_v', \Gamma_b'', \Gamma_b''')$.
+Let $(\Gamma, \Gamma_{mid}, \Gamma') = seqctx(\Gamma_v, \Gamma_v', \Gamma_b'', \Gamma_b''')$.
 If this is undefined, then there exists a $y \in dom(\Gamma_v) \cap dom(\Gamma_b'')$
 that cannot be assigned a type that supports the usage of $y$ in $t_v$
 followed by $t_b$. In this case, $t$ itself would be untypeable. 
 Therefore, $seqctx(\Gamma_v, \Gamma_v', \Gamma_b'', \Gamma_b''')$
 is defined.
 
-By \lemref{lem:upgrade} and the definition of $\mathit{seqctx}$, 
-there exists a $T_v' <: T_v$ such that
-$(\Gamma_{in}, T_v', \Gamma_{mid})$ is a typing of $t_v$.
+By the definition of $\mathit{seqctx}$ it must be the case that
+$(\Gamma, T_v, \Gamma_{mid})$ is a typing of 
+$t_v$. By \lemref{lem:upgrade} there exists a $T_v' <: T_v$ such that
+$(\Gamma, T_v', \Gamma_{mid})$ is a typing of $t_v$.
 
 If $x \in \Gamma_b$, let $T_x = \Gamma_b(x)$ and $T_x' = \Gamma_b'(x)$.
 If $x \notin \Gamma_b$ (i.e. $x$ is not used in the body of the let binding), 
@@ -2947,13 +3047,15 @@ $((\Gamma_b'', x : T_x), T_b, (\Gamma_b''', x : T_x'))$ is a typing of $t'$.
 
 In order for $t$ to be typeable, it must be the case that $T_v' <: T_x$.
 Let $\Gamma_{mid}' = \Gamma_{mid}, x : T_v'$.
-By \lemref{lem:upgrade}, there exists a $T_b' <: T_b$ and $T_x'' <: remap(T_v', T_x \gg T_x')$ such that
+By \lemref{lem:upgrade}, there exists a $T_b' <: T_b$ and $T_x'' <: T_x'$ such that
 $(\Gamma_{mid}', T_b', (\Gamma_{out}, x : T_x''))$ is a typing of $t_b$.
 
 By rule \tlet it follows that $(\Gamma_{in}, T_b', \Gamma_{out})$ is a
-typing of $t$. This typing must be principal.
+typing of $t$. This typing is principal.
 
-%%% TODO: proof of principality from construction?
+%%% TODO: parts of this solution are existentially quantified, and not shown
+%%% to be the smallest / largest types possible to get the principal typing 
+%%% result.
 
 
 \item $t = x.m$.
@@ -2973,26 +3075,31 @@ Let $(\Gamma, \Gamma_{mid}, \Gamma') = \mathit{seqctx}(\Gamma_a, \Gamma_a', \Gam
 If this is not defined, then there exists a $y \in dom(\Gamma_a) \cap dom(\Gamma_b)$
 that cannot be assigned a type that supports the usage of $y$ in $t_a$
 followed by the usage in $t_b$. 
-In this case, $t$ itself would be untypeable. Therefore, it must be defined.
+In this case, $t$ itself would be untypeable. Therefore, 
+$(\Gamma, \Gamma_{mid}, \Gamma')$ is defined.
 
-By the definition of $\mathit{seqctx}$, we have that for each
-$x \in dom(\Gamma_a)$ that $\Gamma(x) <: \Gamma_a(x)$, and
-that $\Gamma_{mid}(x) <: \remapapp{\Gamma(x)}{\Gamma_a(x)}{\Gamma_a'{x}}$.
+By the definition of $\mathit{seqctx}$, the types assigned to each variable
+in $\Gamma$ are the least specific that can support the usage of each variable
+in $t_a$ followed by $t_b$. It must therefore be the case 
+that $(\Gamma, T_a, \Gamma_{mid})$ and $(\Gamma_{mid}, T, \Gamma')$ are typings
+of $t_a$ and $t_b$ respectively. Therefore, by rule \tseq,
+$(\Gamma, T, \Gamma')$ is a typing of $t$.
 
-%%% TODO: Prove that
-It follows that $(\Gamma, T_a', \Gamma_{mid})$ is a typing of
-$t_a$.
+This typing has the least specific
+possible input context and most specific possible output context by the 
+definition of $\mathit{seqctx}$ and its
+application to the principal typings of $t_a$ and $t_b$. The type $T$ is
+not necessarily the most specific type that can be ascribed to the term $t$
+given this context however: for each $x \in dom(\Gamma_b)$, by the definition
+of $\mathit{seqctx}$ we have that $\Gamma_{mid}(x) <: \Gamma_b(x)$.
 
+It follows by \lemref{lem:upgrade} that there exists a $T' <: T$
+such that $(\Gamma_{mid}, T', \Gamma')$ is a typing of
+$t_b$, therefore $(\Gamma, T', \Gamma')$ is a typing of $T$. 
+It follows that $(\Gamma, T', \Gamma')$
+is the principal typing of $t$.
 
-%%% TODO: prove that
-It follows that $(\Gamma_{mid}, T_b', \Gamma_{mid})$ is a typing of
-$t_b$.
-
-
-It follows by rule \tseq that $(\Gamma_{in}, T_b', \Gamma_{out})$ is a typing
-of $t$.
-
-%%% TODO: show this is minimal.
+%%% DODGY need better way to construct type T' type or bound it.
 
 \item $t = \ift{t_c}{t_t}{t_f}$.
 
@@ -3001,11 +3108,8 @@ By induction, $t_c$ has a principal typing $\tau_c = (\Gamma_c, T_c, \Gamma_c')$
 $t_t$ has a principal typing $\tau_t = (\Gamma_t, T_t, \Gamma_t')$ and
 $t_f$ has a principal typing $\tau_f = (\Gamma_f, T_f, \Gamma_f')$.
 
-In order for $t$ to be typeable, it must be the case that a typing
-$(\Gamma_c'', \boolt, \Gamma_c''')$ exists for $t_c$. It follows that as
-$\tau_c$ is a principal typing for $t_c$, that for each $x \in \Gamma_a$ that 
-$\Gamma_a''(x) <: \Gamma_a(x)$ and that $\Gamma_a'(x) <: \Gamma_a'''(x)$,
-with $\boolt <: T_c$.
+In order for $t$ to be typeable, it must be the case that a 
+$T_c <: \boolt$.
 
 %%% seqctx for T_c -> T_t branch
 
@@ -3024,11 +3128,6 @@ with $\boolt <: T_c$.
 Principal typings exist for all terms $t$ which
 are typeable when a type can be assumed for all variables used as functions.
 \end{thm}
-
-\begin{proof}
-by induction on the structure of $t$.
-
-\end{proof}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% normalisation  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
