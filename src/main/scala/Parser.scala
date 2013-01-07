@@ -48,8 +48,10 @@ trait Parser extends org.kiama.util.PositionedParserUtilities {
 
   lazy val typespec : PackratParser[Type] =
     "Unit" ^^ (_ => UnitType()) |
+    "Bool" ^^ (_ => BoolType()) |
     ("{" ~> rep1(statespec) <~ "}" <~ "@") ~ ident ^^ ObjType |
-    ("(" ~> repsep(effectType, ",") <~ "->") ~ typespec ^^ FunType
+    ("(" ~> repsep(effectType, ",") <~ "->") ~ typespec ^^ FunType |
+    ("Top" | "⊤") ^^ (_ => TopType())
 
   lazy val statespec : PackratParser[StateSpec] =
     (ident <~ "{") ~ rep(methodspec) <~ "}" ^^ StateSpec

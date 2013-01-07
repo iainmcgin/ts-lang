@@ -23,84 +23,67 @@ class ParserTest extends FunSuite {
   def checkTerm(termStr : String, expected : Term) = 
     assert(parse(termStr) === Left(expected))
 
-	test("parse unit value") {
-		checkTerm("unit", unitv)
-	}
+  def parseTest(termStr : String, expected : => Term) =
+    test("parse " + termStr) { 
+      assert(parse(termStr) === Left(expected))
+    }
 
-  test("parse zero argument function") {
-    checkTerm("\\().unit", funv(unitv))
-  }
+  // basic values
+	parseTest("unit", unitv)
+  parseTest("true", truev)
+  parseTest("false", falsev)
 
-  test("parse multi argument (no types) function") {
-    checkTerm(
-      "\\(x,y).unit",
-      funv(unitv, p("x"), p("y"))
-    )
-  }
-
-  test("parse function with typed argument") {
-    checkTerm(
-      "\\(x : Unit >> Unit).unit",
-      funv(unitv, p("x", unitt >> unitt))
-    )
-  }
-
-  test("parse function with object type argument") {
+  // function values
+  parseTest("\\().unit", funv(unitv))
+  parseTest("\\(x,y).unit", funv(unitv, p("x"), p("y")))
+  parseTest("\\(x : Unit >> Unit).unit", funv(unitv, p("x", unitt >> unitt)))
+  parseTest("\\(x : Bool >> Bool).unit", funv(unitv, p("x", boolt >> boolt)))
+  parseTest("\\(x : Top >> Top).unit", funv(unitv, p("x", topt >> topt)))
+  parseTest("\\(x : {S{a : Unit >> S}}@S >> {S{a : Unit >> S}}@S).unit", {
     val objType = 
       ObjType(Seq(StateSpec("S", Seq(MethodSpec("a", unitt, "S")))), "S")
+    funv(unitv, p("x", objType >> objType))
+  })
 
-    checkTerm(
-      "\\(x : {S{a : Unit >> S}}@S >> {S{a : Unit >> S}}@S).unit",
-      funv(unitv, p("x", objType >> objType))
-    )
-  }
-
-  test("parse minimal object value") {
-    checkTerm(
-      "[S{}]@S",
+  // object values
+  parseTest("[S{}]@S", ObjValue(Seq(StateDef("S", Seq())), "S"))
+  parseTest("[ A{ a=(unit,B) } B { b=(unit,A) } ]@A",
       ObjValue(
-        Seq(StateDef("S", Seq())),
-        "S"
-        )
-      )
-  }
-
-  test("parse object value for pattern (ab)*") {
-    checkTerm(
-      "[ A{ a=(unit,B) } B { b=(unit,A) } ]@A",
-      ObjValue(
-        Seq(
-          StateDef("A", Seq(MethodDef("a", unitv, "B"))),
-          StateDef("B", Seq(MethodDef("b", unitv, "A")))
-          ),
+        Seq(StateDef("A", Seq(MethodDef("a", unitv, "B"))),
+            StateDef("B", Seq(MethodDef("b", unitv, "A")))),
         "A"
         )
       )
-  }
 
-  test("parse triple sequence") {
-    checkTerm(
-      "unit; unit; unit",
-      seq(unitv, unitv, unitv)
-    )
-  }
+  // sequences
+  parseTest("unit; unit; unit", seq(unitv, unitv, unitv))
 
-  test("parse true literal") {
-    checkTerm("true", truev)
-  }
-
-  test("parse false literal") {
-    checkTerm("false", falsev)
-  }
-
-  test("parse simple if-then-else") {
-    checkTerm("if true then unit else unit", If(truev, unitv, unitv))
-  }
-
-  test("parse if-then-else with sequences in branches") {
-    checkTerm("if true then (x.m; y.n) else (y.n; x.m)",
+  // conditionals
+  parseTest("if true then unit else unit", If(truev, unitv, unitv))
+  parseTest("if true then (x.m; y.n) else (y.n; x.m)",
       If(truev, seq(MethCall("x", "m"), MethCall("y", "n")), 
-                seq(MethCall("y", "n"), MethCall("x", "m")))
-    )
-  }
+                seq(MethCall("y", "n"), MethCall("x", "m"))))
+
+  // let-bindings
+  parseTest("let x = unit in true", LetBind("x", unitv, truev))
+  parseTest("let x = unit in let y = unit in true",
+    LetBind("x", unitv, LetBind("y", unitv, truev)))
+  parseTest("let x = (let y = unit in unit) in let z = true in false",
+    LetBind("x", LetBind("y", unitv, unitv), LetBind("z", truev, falsev)))
+
+  // method calls
+  parseTest("x.m", MethCall("x", "m"))
+  parseTest("y.y", MethCall("y", "y"))
+
+  // function calls
+  parseTest("f()", FunCall("f", Seq.empty))
+  parseTest("x(a, b, c)", FunCall("x", Seq("a", "b", "c")))
+  parseTest("f(f)", FunCall("f", Seq("f"))) 
+    //        ^  semantically invalid but syntactically fine
+
+  // parsing precedence of seq and let binding
+  parseTest("let x = \\().unit in x() ; unit",
+    LetBind("x", funv(unitv), seq(FunCall("x", Seq.empty), unitv)))
+  parseTest("(let x = unit in unit) ; unit",
+    seq(LetBind("x", unitv, unitv), unitv))
 }
