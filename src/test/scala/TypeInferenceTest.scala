@@ -21,6 +21,7 @@ import org.kiama.util.Messaging._
 
 import TypeChecker._
 import sm._
+import TestUtils._
 
 import grizzled.slf4j.Logger
 
@@ -112,14 +113,7 @@ class TypeInferenceTest extends FunSuite with ShouldMatchers {
   // object tests
   infTest("object value, no methods",
     """[ S1 { } ]@S1""")((t, inCtx, freeVars, te, outCtx) => {
-
-    checkIsomorphic(
-      te, 
-      SolvedObjectTE(
-        Graph(State("S1")),
-        Set("S1")
-      )
-    )
+    checkIsomorphic(te, emptyObject)
   })
 
   infTest("object value, single method",

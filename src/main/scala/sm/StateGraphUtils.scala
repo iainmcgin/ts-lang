@@ -179,6 +179,7 @@ object StateGraphUtils {
       : (StateGraph, StateNameEquiv) = {
 
     val (combinedGraph, g2RelabeledEquiv) = includeInto(g1, g2)
+    val g2RelabeledNames = g2RelabeledEquiv.relation.map(_._2)
 
     val sg = new StateGenerator(g1.nodes.toNodeInSet)
 
@@ -193,14 +194,18 @@ object StateGraphUtils {
     var stateMap : Map[Set[_ <: StateGraph#NodeT], State] = 
       Map(startSet -> g1startInner.value)
 
-    var g2OverlayEquiv = Set.empty[(String, String)]
+    var g2OverlayEquiv = g2RelabeledNames.map(n => (n,n))
     var overlayGraph = combinedGraph
 
     visit(startSet)(stateSet => {
       val partition = partitionEdges(stateSet)
 
-      partition.disjoint.foreach(e => 
-        overlayGraph += stateMap(stateSet).value ~> e.edge.to.value by e.edge.m)
+      val g2State = stateSet.filter(g2RelabeledNames contains _.value.name).head
+      g2OverlayEquiv += (g2State.value.name -> stateMap(stateSet).value.name)
+
+      partition.disjoint.foreach { e => 
+        overlayGraph += stateMap(stateSet).value ~> e.edge.to.value by e.edge.m
+      }
 
       val visitList = (partition.shared map { case (methodName, edgeSet) => {
 
@@ -217,9 +222,33 @@ object StateGraphUtils {
       Right(visitList)
     })
 
+    // remove all nodes from g2 which are not reachable from the start point
+    val (cleanedGraph, removedStates) = 
+      removeUnreachable(overlayGraph, g1start, g2RelabeledNames)
+
+    // remove all dead entries from the equivalence relation
+    g2OverlayEquiv = g2OverlayEquiv.filterNot(removedStates contains _._2)
+
     val g2Equiv = g2RelabeledEquiv.compose(Relation(g2OverlayEquiv))
 
-    (overlayGraph, g2Equiv)
+    (cleanedGraph, g2Equiv)
+  }
+
+  def removeUnreachable(
+      g : StateGraph, 
+      start : String, 
+      removeCandidates : Set[String])
+      : (StateGraph, CSet[String]) = {
+
+    val unconnected = 
+      findUnconnected(g, State(start)).filter { (s : StateGraph#NodeT) => 
+        val name = s.value.name
+        removeCandidates contains s.value.name
+      }
+
+    val cleanedGraph = g -- unconnected
+
+    (cleanedGraph, unconnected.map { (s : StateGraph#NodeT) => s.value.name })
   }
 
   case class CannotConnectException() extends Exception
@@ -345,18 +374,23 @@ object StateGraphUtils {
   def connectOpt(
       o1Opt : Option[(StateGraph, Option[Set[String]])],
       o2Opt : Option[(StateGraph, Option[Set[String]])]
-      ) : Option[(StateGraph, Option[Set[String]])] = {
+      ) : Option[(StateGraph, Option[Set[String]])] =
+    o1Opt.map(connectRightOpt(_, o2Opt)) orElse (o2Opt)
 
-    o1Opt.flatMap({ case (g1, st1Opt) => {
-      o2Opt.map({ case (g2, st2Opt) => {
-        val (combinedGraph, g2Equiv) = includeInto(g1, g2)
+  def connectRightOpt(
+      o1 : (StateGraph, Option[Set[String]]),
+      o2Opt : Option[(StateGraph, Option[Set[String]])]
+      ) : (StateGraph, Option[Set[String]]) = {
 
-        val st2RelabeledOpt = 
-          st2Opt.map(_.map(g2Equiv.findUniqueRightEquivOrFail(_)))
+    val (o1Graph, o1StatesOpt) = o1
+    o2Opt.map { case (o2Graph, o2StatesOpt) =>
+      val (combinedGraph, g2Equiv) = includeInto(o1Graph, o2Graph)
 
-        connectStatesOpt(combinedGraph, st1Opt, st2RelabeledOpt)
-      }}) orElse (o1Opt)
-    }}) orElse (o2Opt)
+      val o2StatesRelabeledOpt = 
+        o2StatesOpt.map(_.map(g2Equiv.findUniqueRightEquivOrFail(_)))
+
+      connectStatesOpt(combinedGraph, o1StatesOpt, o2StatesRelabeledOpt)
+    } getOrElse(o1)
   }
 
   @throws(classOf[CannotConnectException])
@@ -490,6 +524,127 @@ object StateGraphUtils {
       g2start : State) : Boolean =
     findInconsistency(g1, g1start, g2, g2start).isRight
 
+
+  def checkIsomorphic(
+      g1 : StateGraph,
+      g1start : Set[State],
+      g2 : StateGraph,
+      g2start : Set[State],
+      varEquiv : Bijection[TypeVar, TypeVar] = Bijection.empty
+      ) : Option[(Bijection[TypeVar, TypeVar], Bijection[State,State])] = {
+
+    // the state sets offer strong starting points in checking whether the two
+    // graphs are isomorphic. If no permutation of pairs works, the graphs
+    // are not isomorphic based on the provided assumptions.
+
+    // TODO
+    None
+  }
+
+  /**
+   * Inspects the two provided graphs for alpha equivalence. The state sets
+   * provided for each graph must match such that for s1 in g1 there exists
+   * an s2 in g2 such that s1 is alpha equivalent to s2, and that no other
+   * s in g1 is equivalent to g2.
+   */
+  private def checkIsomorphic(
+      g1states : CSet[_ <: StateGraph#NodeT],
+      g2states : CSet[_ <: StateGraph#NodeT],
+      varEquiv : Bijection[TypeVar,TypeVar],
+      stateEquiv : Bijection[State,State])
+      : Option[(Bijection[TypeVar,TypeVar], Bijection[State,State])] = {
+
+    if(g1states.size != g2states.size) return None
+
+    // TODO: can write a more efficient permuteMatch based on edge count
+    val possibleMatchings = permuteMatch(g1states, g2states)
+
+    possibleMatchings.foreach { matchSet =>
+      val validMatch =
+        (matchSet.foldLeft
+          (Option((varEquiv, stateEquiv)))
+          { case (equivOpt, (g1s, g2s)) =>
+            equivOpt.flatMap { case (veq, seq) => 
+              checkIsomorphic(g1s, g2s, veq, seq) }
+          }
+        )
+      
+      if(validMatch.isDefined) return validMatch
+    }
+
+    return None
+  }
+
+  def permuteMatch[X,Y](xs : CSet[X], ys : CSet[Y]) : CSet[CSet[(X,Y)]] = {
+    if(xs.size != ys.size) return Set.empty
+    if(xs.size == 1) return Set(Set((xs.head, ys.head)))
+
+    xs.flatMap(x => 
+      ys.flatMap(y => permuteMatch(xs - x, ys - y).map(_ + (x -> y)))
+    )
+  }
+
+  private def checkIsomorphic(
+      g1s : StateGraph#NodeT,
+      g2s : StateGraph#NodeT,
+      varEquiv : Bijection[TypeVar,TypeVar],
+      stateEquiv : Bijection[State,State])
+      : Option[(Bijection[TypeVar, TypeVar], Bijection[State,State])] = {
+    
+    val alreadyEquiv = stateEquiv.checkEquivalent(g1s.value, g2s.value)
+    if(alreadyEquiv.isDefined) {
+      return alreadyEquiv.flatMap(if(_) Some(varEquiv,stateEquiv) else None)
+    }
+
+    // work on the assumption that this state pair is equivalent
+    val newStateEquivOpt = stateEquiv.addEquivalence(g1s.value, g2s.value)
+    if(newStateEquivOpt.isEmpty) return None
+    var newStateEquiv = newStateEquivOpt.get
+    var newVarEquiv = varEquiv
+
+    // 1. outward edge sets must be the same
+    //    a. meaning return values must also be isomorphic
+    // 2. nodes on the ends of edge sets must be isomorphic (recursive call)
+    // 3. isomorphic pair-wise matching of source nodes of inward edges must
+    //    be identical
+
+    val g1Outgoing = g1s outgoing
+    val g2Outgoing = g1s outgoing
+
+    if(g1Outgoing.size != g2Outgoing.size) return None
+
+    val g1OutgoingSorted = ((g1Outgoing) toList) sortBy (_.edge.m.name)
+    val g2OutgoingSorted = ((g1Outgoing) toList) sortBy (_.edge.m.name)
+
+    val edgePairs = g1OutgoingSorted zip g2OutgoingSorted
+
+    edgePairs foreach { case (g1EdgeT, g2EdgeT) =>
+      val g1Edge = g1EdgeT.edge
+      val g2Edge = g2EdgeT.edge
+      // check return values of methods are isomorphic
+      // recursively check that target nodes are isomorphic
+      if(g1Edge.m.name != g2Edge.m.name) return None
+      
+      val g1RetType = g1Edge.m.retType
+      val g2RetType = g2Edge.m.retType
+      val newVarEquivOpt = TypeExprUtil.checkIsomorphic(g1RetType, g2RetType, newVarEquiv)
+      if(newVarEquivOpt.isEmpty) return None
+      newVarEquiv = newVarEquivOpt.get
+
+      val result =
+          checkIsomorphic(g1Edge.to, g2Edge.to, newVarEquiv, newStateEquiv).
+          getOrElse { return None }
+      newVarEquiv = result._1
+      newStateEquiv = result._2
+    }
+
+    checkIsomorphic(
+      g1s diPredecessors, 
+      g2s diPredecessors, 
+      newVarEquiv, 
+      newStateEquiv)
+  }
+
   /**
    * Inspects the two provided graphs for alpha equivalence, using the
    * provided states as a starting point. If the graphs are alpha equivalent,
@@ -594,6 +749,8 @@ object StateGraphUtils {
 
     None
   }
+
+
 
   /**
    * Performs a guided traversal over two state graphs.

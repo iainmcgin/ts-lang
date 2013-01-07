@@ -24,6 +24,9 @@ class VarSolutionSet[T] {
     solutions(v)
   }
 
+  def getCanonicalVars() =
+    solutions.values.foldLeft(Set.empty[TypeVar])(_ + _()._1)
+
   def getCanonicalEquiv(v : TypeVar) =
     getProxy(v).get()._1
 
@@ -33,7 +36,7 @@ class VarSolutionSet[T] {
   def getSolutionOrFail(v : TypeVar) : T = getSolution(v).get
 
   def areEquivalent(v1 : TypeVar, v2 : TypeVar) =
-    getProxy(v1).get()._1 == getProxy(v2).get()._2
+    getProxy(v1).get()._1 == getProxy(v2).get()._1
 
   def makeEquivalent
       (v1 : TypeVar, v2 : TypeVar) {

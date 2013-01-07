@@ -23,26 +23,11 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
   private[ts] var objects = new VarSolutionSet[StateGraph]()
   private[ts] var states = new VarSolutionSet[Set[String]]()
 
-  // solving cases:
-  // 1. solve subtype constraint where upper bound solved
-  // 2. solve remap where effect is solved
-  // 3. solve equality
-  // 4. solve join / meet
-
-  // we assume all constraints have been type-normalised
-  // so that wherever a type is referred to it is always
-  // of form O@S. Specifically, don't want
-  // a = O@S join O'@S'
-  // instead want
-  // O@S = O'@S' join O''@S''
-
-  def solve() {
-    val partition = partitionConstraints()
-    resolveDirectObjectEqualities(partition.objectEqualities)
-    resolveDirectStateEqualities(partition.stateEqualities)
-
-    partition.definitions.foreach(solveDefinition(_))
-  }
+  def getCurrentSolution(o : ObjectTE) 
+      : Option[(StateGraph, Option[Set[String]])] =
+    objects.
+      getSolution(o.objVar).
+      map(os => (os, states.getSolution(o.stateVar)))
 
   def getSolutionFor(o : ObjectTE) : Option[SolvedObjectTE] = {
     val objGraphOpt = objects.getSolution(o.objVar)
@@ -53,90 +38,189 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
     ))
   }
 
+  def solve() : Boolean = {
+    val (objectEqualities, stateEqualities, otherConstraints) = 
+      extractEqualities()
+
+    resolveDirectObjectEqualities(objectEqualities)
+    resolveDirectStateEqualities(stateEqualities)
+
+    val constraintsByObject = partitionConstraintsByObject(otherConstraints)
+
+    val solveOrder = deriveSolveOrder(constraintsByObject)
+
+    if(solveOrder.isEmpty) return false;
+
+    solveOrder.get.foreach(o => solveConstraints(constraintsByObject(o)))
+
+    return true;
+  }
+
   type DirectEquality = Pair[TypeVar, TypeVar]
-  type Definition = Pair[ObjectTE, TypeExpr]
 
-  case class ConstraintPartition(
-    objectEqualities : Seq[DirectEquality],
-    stateEqualities : Seq[DirectEquality],
-    subtypes : Seq[SubtypeConstraint],
-    definitions : Seq[Definition]
-  )
-
-  private[ts] def partitionConstraints() : ConstraintPartition =
-    (constraints.foldLeft
-      (ConstraintPartition(Seq.empty, Seq.empty, Seq.empty, Seq.empty))
-      ((result, constraint) => {
+  /**
+   * Extracts direct equalities between object variables and state variables
+   * from the constraint set, where the equality is either explicitly stated
+   * or implied as part of some more complex constraint.
+   */
+  def extractEqualities() 
+      : (Set[DirectEquality], Set[DirectEquality], Seq[TypeConstraint]) = {
+    (constraints.foldLeft 
+      ((Set.empty[DirectEquality], Set.empty[DirectEquality], Seq.empty[TypeConstraint]))
+      { case ((objectEqualities, stateEqualities, others), constraint) =>
         constraint match {
-          case ec @ EqualityConstraint(a,b) => {
-            (a, b) match {
-              case (ObjectTE(o1,s1), ObjectTE(o2,s2)) =>
-                // direct equality of object and state variables
-                result.copy(
-                  objectEqualities = (o1,o2) +: result.objectEqualities,
-                  stateEqualities = (s1,s2) +: result.stateEqualities)
-
-              case (o @ ObjectTE(o1,s1), other) =>
-                // a definition of some sort
-                other match {
-                  case RemapTE(ObjectTE(o2,_), _) =>
-                    // remap implies the input object variable and
-                    // the result object variable are equal
-                    result.copy(
-                      objectEqualities = (o1,o2) +: result.objectEqualities,
-                      definitions = (o, other) +: result.definitions)
-                  case _ =>
-                    result.copy(definitions = (o, other) +: result.definitions)
-                }
-              case _ =>
-                throw new IllegalArgumentException()
-            }
+          case EqualityConstraint(ObjectTE(o1,s1), other) => other match {
+            case ObjectTE(o2, s2) =>
+              (objectEqualities + (o1 -> o2),
+               stateEqualities + (s1 -> s2),
+               others)
+            case RemapTE(
+              ObjectTE(o2,_), 
+              EffectTE(ObjectTE(o3,s3),ObjectTE(o4,s4))) =>
+              (objectEqualities + (o1 -> o2) + (o3 -> o4), 
+               stateEqualities,
+               constraint +: others)
+            case _ => (objectEqualities, stateEqualities, constraint +: others)
           }
-          case sc @ SubtypeConstraint(_,_) => {
-            result.copy(subtypes = sc +: result.subtypes)
-          }
+          case _ => (objectEqualities, stateEqualities, constraint +: others)
         }
-      })
+      }
     )
-  
+  }
+
   private[ts] def resolveDirectObjectEqualities(
-      equalities : Seq[DirectEquality]) {
+      equalities : Set[DirectEquality]) {
     equalities.foreach { case Pair(o1, o2) => {
       objects.makeEquivalent(o1, o2)
     }}
   }
 
   private[ts] def resolveDirectStateEqualities(
-      equalities : Seq[DirectEquality]) {
+      equalities : Set[DirectEquality]) {
     equalities.foreach { case Pair(s1, s2) => { 
       states.makeEquivalent(s1, s2) 
     }}
   }
 
-  def solveSubtype(child : TypeExpr, parent : TypeExpr) {
-    // patch parent into child
+  type ConstraintsByObject = Map[TypeVar, Seq[TypeConstraint]]
+
+  def partitionConstraintsByObject(constraints : Seq[TypeConstraint])
+      : ConstraintsByObject = {
+
+    (constraints.foldLeft
+      (Map.empty[TypeVar, Seq[TypeConstraint]].withDefaultValue(Seq.empty))
+      ((map, constraint) => constraint match {
+        case EqualityConstraint(ObjectTE(o1,_), other) => {
+          val canonical = objects.getCanonicalEquiv(o1)
+          map + (canonical -> (constraint +: map(canonical)))
+        }
+        case SubtypeConstraint(ObjectTE(o1,_), _) => {
+          val canonical = objects.getCanonicalEquiv(o1)
+          map + (canonical -> (constraint +: map(canonical)))
+        }
+        case _ => map
+      })
+    )
   }
 
-  def solveDefinition(defn : Definition) {
-    val (obj, objDefn) = defn
-    objDefn match {
-      case SolvedObjectTE(states, state) => {
-        // how literally do we interpret equality here?
-      }
-      case JoinTE(left @ ObjectTE(_,_), right @ ObjectTE(_,_)) => {
-        solveJoin(obj, left, right)
-      }
-      case MeetTE(left @ ObjectTE(_,_), right @ ObjectTE(_,_)) => {
-        val meetObj = solveMeet(left, right)
+  def deriveSolveOrder(constraints : ConstraintsByObject) : Option[Seq[TypeVar]] = {
 
+    type DependentsMap = Map[TypeVar, Set[TypeVar]]
+    type DependencyCount = Map[TypeVar, Int]
+    type DependencyInfo = (DependentsMap, DependencyCount)
+
+    def addDependency(dep : (TypeVar, TypeVar), depInfo : DependencyInfo)
+        : DependencyInfo = {
+      val dependent = objects.getCanonicalEquiv(dep._1)
+      val dependee = objects.getCanonicalEquiv(dep._2)
+      val (dependents, dependencyCount) = depInfo
+      val oldDeps = dependents.getOrElse(dependee, Set.empty)
+      val oldDepCount = dependencyCount.getOrElse(dependent, 0)
+
+      if(!oldDeps.contains(dependent)) {
+        val newDependents = dependents + (dependee -> (oldDeps + dependent))
+        val newDependencyCount = dependencyCount + (dependent -> (oldDepCount + 1))
+        (newDependents, newDependencyCount)
+      } else {
+        depInfo
       }
-      case RemapTE(input @ ObjectTE(_,_), 
-                   effect @ EffectTE(_,_)) => {
-        solveRemap(obj, input, effect)
-      }
-      case _ =>
-        throw new IllegalArgumentException()
     }
+
+    val emptyDepInfo = 
+      (Map.empty[TypeVar, Set[TypeVar]].withDefaultValue(Set.empty), 
+       objects.getCanonicalVars().map(v => (v,0)).toMap)
+
+    val (dependents, dependencyCount) = 
+      (constraints.foldLeft
+        (emptyDepInfo)
+        { case (depInfo, (o1, objConstraints)) =>
+          (objConstraints.foldLeft
+            (depInfo)
+            ((depInfo, constraint) => constraint match {
+              case EqualityConstraint(ObjectTE(o1,_), other) => other match {
+                // internal join implies no inter-object dependencies
+                case JoinTE(_, _) => depInfo
+                case SeparateJoinTE(ObjectTE(o2, _), ObjectTE(o3, _)) =>
+                  addDependency((o1 -> o2), addDependency((o1 -> o3), depInfo))
+                case MeetTE(ObjectTE(o2, _), ObjectTE(o3, _)) =>
+                  addDependency((o1 -> o2), addDependency((o1 -> o3), depInfo))
+                case RemapTE(_, EffectTE(ObjectTE(o2, _), _)) => {
+                  addDependency((o1 -> o2), depInfo)
+                }
+                case _ => depInfo
+              }
+            })
+          )
+        }
+      )
+
+    var solveOrder = Vector.empty[TypeVar]
+    var depCounts = dependencyCount
+    while(!depCounts.isEmpty && depCounts.exists(_._2 == 0)) {
+      depCounts.filter(_._2 == 0).foreach { case (o,_) => 
+        val canonical = objects.getCanonicalEquiv(o)
+        solveOrder :+= canonical
+        depCounts -= canonical
+        dependents.getOrElse(canonical, Set.empty).foreach { dep =>
+          val depCount = math.max(depCounts.getOrElse(dep, 0) - 1, 0)
+          depCounts += (dep -> depCount)
+        }
+      }
+
+    }
+
+    Some(solveOrder)
+  }
+
+  def solveConstraints(objConstraints : Seq[TypeConstraint]) = {
+    var internalJoins = Seq.empty[(ObjectTE, ObjectTE, ObjectTE)]
+
+    objConstraints.foreach(_ match { 
+      case EqualityConstraint(o @ ObjectTE(_,_), other) => other match {
+        case SolvedObjectTE(objGraph, objStates) => {
+          objects.updateSolution(o.objVar, objGraph)
+          states.updateSolution(o.stateVar, objStates)
+        }
+        case j @ JoinTE(left @ ObjectTE(_,_), right @ ObjectTE(_,_)) =>
+          internalJoins +:= (o, left, right)
+        case SeparateJoinTE(left @ ObjectTE(_,_), right @ ObjectTE(_,_)) =>
+          solveSeparateJoin(o, left, right)
+        case MeetTE(left @ ObjectTE(_,_), right @ ObjectTE(_,_)) =>
+          solveMeet(o, left, right)
+        case RemapTE(input @ ObjectTE(_,_), effect @ EffectTE(_,_)) =>
+          solveRemap(o, input, effect)
+        case _ =>
+          throw new IllegalArgumentException()
+      }
+    })
+
+    internalJoins.foreach { case (result, left, right) => 
+      solveJoin(result, left, right) 
+    }
+  }
+
+  def solveSubtype(child : TypeExpr, parent : TypeExpr) {
+    // patch parent into child
   }
 
   def solveRemap(
@@ -199,6 +283,9 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
           println("existing solution for param: " + graph + "@" + states)
           val (newGraph, effectStateEquiv) = 
             StateGraphUtils.overlay(graph, states, effectGraph, effectInState)
+
+          println("equiv: " + effectStateEquiv)
+          println("effect out: " + effectOutStates)
 
           val outStates = 
             effectOutStates.flatMap(effectStateEquiv.findRightEquivs(_))
@@ -264,7 +351,7 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
     }
 
     effectPathOpt.map({ case (graph, inStates, outStates) => {
-
+      println("effect before normalisation: " + graph + "@" + inStates + " >> " + outStates)
       val (intersectionGraph, intersectionInState, stateEquiv) = 
         StateGraphUtils.internalIntersection(graph, inStates)
 
@@ -285,13 +372,8 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
     // of each graph, perform union of post parts and direct pre to
     // union part?
 
-    val leftObjOpt = objects.getSolution(left.objVar)
-    val leftSolnOpt = 
-      leftObjOpt.map(o => (o, states.getSolution(left.stateVar)))
-
-    val rightObjOpt = objects.getSolution(right.objVar)
-    val rightSolnOpt = 
-      rightObjOpt.map(o => (o, states.getSolution(right.stateVar)))
+    val leftSolnOpt = getCurrentSolution(left)
+    val rightSolnOpt = getCurrentSolution(right)
 
     val solnOpt = StateGraphUtils.connectOpt(leftSolnOpt, rightSolnOpt)
 
@@ -307,11 +389,50 @@ class ObjectConstraintSolver(private[ts] val constraints : Seq[TypeConstraint]) 
   }
 
   def solveJoin(result : ObjectTE, left : ObjectTE, right : ObjectTE) {
-    // union of graphs, if they are different objects
-    // otherwise, state set union
+    // the object variables must be equal,
+    // solution to state set is union of left and right state sets
   }
 
-  def solveMeet(left : ObjectTE, right : ObjectTE) : SolvedObjectTE = {
+  def solveSeparateJoin(result : ObjectTE, left : ObjectTE, right : ObjectTE) {
+    // the left and right objects are not equal
+    // compute intersection of the two solutions, this is then
+    // the result
+
+    val leftSolnOpt = getSolutionFor(left)
+    val rightSolnOpt = getSolutionFor(right)
+
+    if(leftSolnOpt.isEmpty || rightSolnOpt.isEmpty) {
+      throw new IllegalArgumentException("no solution for join components")
+    }
+
+    val leftSoln = leftSolnOpt.get
+    val rightSoln = rightSolnOpt.get
+
+    val (leftGraph, leftStart, _) = 
+      StateGraphUtils.internalIntersection(leftSoln.graph, leftSoln.states)
+    val (rightGraph, rightStart, _) =
+      StateGraphUtils.internalIntersection(rightSoln.graph, rightSoln.states)
+
+    val (intersectionGraph, leftEquiv, _) =
+      StateGraphUtils.intersection(
+        leftGraph, leftStart, 
+        rightGraph, rightStart)
+
+    val intersectionStart = leftEquiv.findUniqueRightEquivOrFail(leftStart)
+
+
+    val joinSolution = (intersectionGraph, Option(Set(intersectionStart)))
+
+    val resultSolnOpt = getCurrentSolution(result)
+
+    val (resultGraph, resultStatesOpt) = 
+      StateGraphUtils.connectRightOpt(joinSolution, resultSolnOpt)
+
+    objects.updateSolution(result.objVar, resultGraph)
+    resultStatesOpt.foreach(states.updateSolution(result.stateVar, _))
+  }
+
+  def solveMeet(result : ObjectTE, left : ObjectTE, right : ObjectTE) : SolvedObjectTE = {
     // intersection of graphs, irrespective of whether they
     // are the same object or not?
     throw new IllegalArgumentException()

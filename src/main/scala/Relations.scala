@@ -11,7 +11,7 @@
 
 package uk.ac.gla.dcs.ts
 
-class Relation[T,U](private val relation : Set[(T,U)]) {
+class Relation[T,U](val relation : Set[(T,U)]) {
 
   def findRightEquivs(left : T) : Set[U] =
     relation.filter(_._1 == left).map(_._2)

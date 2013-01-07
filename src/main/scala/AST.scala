@@ -21,34 +21,67 @@ trait SourceElement extends Attributable with Positioned
 sealed abstract class Term extends SourceElement
 sealed abstract class Value extends Term
 
-case class UnitValue() extends Value
-case class TrueValue() extends Value
-case class FalseValue() extends Value
+case class UnitValue() extends Value { override def toString = "unit" }
+case class TrueValue() extends Value { override def toString = "true" }
+case class FalseValue() extends Value { override def toString = "false" }
 case class ObjValue(states : Seq[StateDef], state : String) extends Value {
   val stateMap =
     (states.foldLeft
       (Map.empty[String,StateDef])
       ((m, s) => m + (s.name -> s))
     )
+
+  override def toString = states.mkString("{", " ", "}") + "@" + state
 }
 
-case class FunValue(params : Seq[ParamDef], body : Term) extends Value
+case class FunValue(params : Seq[ParamDef], body : Term) extends Value {
+  override def toString = params.mkString("\\(", ", ", ").") + "(" + body + ")"
+}
 
-case class LetBind(varName : String, value : Term, body : Term) extends Term
-case class Update(varName : String, body : Term) extends Term
-case class MethCall(objVarName : String, methName : String) extends Term
-case class Sequence(left : Term, right : Term) extends Term
-case class FunCall(funName : String, paramNames : Seq[String]) extends Term
-case class If(condition : Term, whenTrue : Term, whenFalse : Term) extends Term
+case class LetBind(varName : String, value : Term, body : Term) extends Term {
+  override def toString = 
+    "let " + varName + " = (" + value + ") in (" + body + ")"
+}
+
+case class Update(varName : String, body : Term) extends Term {
+  override def toString =
+    varName + ":= (" + body + ")"
+}
+
+case class MethCall(objVarName : String, methName : String) extends Term {
+  override def toString = objVarName + "." + methName
+}
+
+case class Sequence(left : Term, right : Term) extends Term {
+  override def toString = left + " ; " + right
+}
+
+case class FunCall(funName : String, paramNames : Seq[String]) extends Term {
+  override def toString = funName + paramNames.mkString("(", ", ", ")")
+}
+
+case class If(condition : Term, whenTrue : Term, whenFalse : Term) extends Term {
+  override def toString = 
+    "if (" + condition + ") then (" + whenTrue + ") else (" + whenFalse + ")"
+}
 
 /* term fragments */
 
 case class StateDef(name : String, methods : Seq[MethodDef])
-  extends SourceElement
+    extends SourceElement {
+  override def toString = name + methods.mkString(" {", ", ", "}")
+}
+
 case class MethodDef(name : String, ret : Value, nextState : String)
-  extends SourceElement
+    extends SourceElement {
+  override def toString = name + " = (" + ret + ", " + nextState + ")"
+}
+
 case class ParamDef(name : String, typeInfo : Option[EffectType]) 
-  extends SourceElement
+  extends SourceElement {
+
+  override def toString = name + typeInfo.map(" : " + _).getOrElse("")  
+}
 
 /* special error values */
 
@@ -118,6 +151,10 @@ sealed abstract class Type extends Attributable {
   }
 }
 
+case class TopType() extends Type {
+  override def toString = "⊤"
+}
+
 case class UnitType() extends Type {
   override def toString = "Unit"
 }
@@ -153,7 +190,7 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
     None
   }
 
-  override def toString = "{ " + states.mkString(" ") + "}@" + state
+  override def toString = states.mkString("{ ", " ", " }@") + state
 }
 
 /* type fragments */
@@ -169,7 +206,7 @@ case class StateSpec(name : String, methods : Seq[MethodSpec]) {
     (methodMap get method) map ((ms : MethodSpec) => ms.nextState)
   def retType(method : String) = (methodMap get method) map (_.ret)
 
-  override def toString = name + "{ " + methods.mkString("; ") + " }"
+  override def toString = name + "{ " + methods.mkString("{ ", "; ", " }")
 }
 
 case class MethodSpec(name : String, ret : Type, nextState : String) {

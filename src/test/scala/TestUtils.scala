@@ -61,6 +61,11 @@ object TestUtils {
 
   implicit def strToUpdateHelper(str : String) = UpdateHelper(str)
 
+  implicit def typeToConstraintBuilder(typ : TypeExpr) = 
+    new ConstraintBuilder(typ)
+
+  def remap(input : TypeExpr, effect : EffectTE) = RemapTE(input, effect)
+
   /* state and method creation helpers */
 
   def s(name : String) = State(name)
@@ -70,6 +75,34 @@ object TestUtils {
   def methodGraph(m : Method) : (StateGraph, String, String) = 
     (Graph(s("A") ~> s("B") by m), "A", "B")
 
+  def call(m : Method, param : EffectTE, eff : EffectTE) 
+      : Seq[TypeConstraint] = {
+        
+    val (g, inState, outState) = methodGraph(m)
+    val (effIn, effOut) = extractObjects(eff)
+    val (paramIn, paramOut) = extractObjects(param)
+
+    Seq(
+      paramOut =-= remap(paramIn, eff),
+      effIn =-= SolvedObjectTE(g, inState),
+      effOut =-= SolvedObjectTE(g, outState)
+    )
+  }
+
+  def extractObjects(eff : EffectTE) = 
+    eff match {
+      case EffectTE(in @ ObjectTE(_,_), out @ ObjectTE(_,_)) => (in,out)
+      case _ => throw new IllegalArgumentException()
+    }
+    
+
+  val emptyGraph : StateGraph = Graph(s("A"))
+  val emptyObject = SolvedObjectTE(emptyGraph, "A")
+
+}
+
+class ConstraintBuilder(typ : TypeExpr) {
+  def =-=(other : TypeExpr) = EqualityConstraint(typ, other)
 }
 
 class TestUtilsTest extends org.scalatest.FunSuite {

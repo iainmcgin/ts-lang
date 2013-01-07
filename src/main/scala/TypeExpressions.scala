@@ -38,9 +38,19 @@ case class ObjectTE(objVar : TypeVar, stateVar : TypeVar) extends TypeExpr {
 
 case class SolvedObjectTE(
   graph : StateGraph, 
-  states : Set[String]) extends TypeExpr
+  states : Set[String]) extends TypeExpr {
+}
+
+object SolvedObjectTE {
+  def apply(graph : StateGraph, state : String) : SolvedObjectTE = 
+    SolvedObjectTE(graph, Set(state))
+}
 
 case class JoinTE(left : TypeExpr, right : TypeExpr) extends TypeExpr {
+  override def toString = left + " ⊻ " + right
+}
+
+case class SeparateJoinTE(left : TypeExpr, right : TypeExpr) extends TypeExpr {
   override def toString = left + " ⊔ " + right
 }
 
@@ -80,46 +90,53 @@ object TypeExprUtil {
   type TVEquivalence = Equivalence[TypeVar,TypeVar]
 
   def isomorphic(
-    t1 : TypeExpr, 
-    t2 : TypeExpr, 
-    equivVars : TVEquivalence) 
-    : Boolean = {
+      t1 : TypeExpr, 
+      t2 : TypeExpr, 
+      equivVars : TVEquivalence) 
+      : Boolean =
+    checkIsomorphic(t1, t2, Bijection(equivVars.toMap)).isDefined
 
+  def checkIsomorphic(
+      t1 : TypeExpr,
+      t2 : TypeExpr,
+      equivVars : Bijection[TypeVar, TypeVar]) 
+      : Option[Bijection[TypeVar, TypeVar]] =
     (t1, t2) match {
-      case (UnitTE, UnitTE) => true
-      case (VarTE(v1), VarTE(v2)) => equivVars.addEquivalence(v1, v2)
+      case (UnitTE, UnitTE) => Some(equivVars)
+      case (VarTE(v1), VarTE(v2)) => equivVars.addEquivalence(v1,v2)
       case (FunTE(f1params, f1ret), FunTE(f2params, f2ret)) =>
         functionsIsomorphic(f1params, f1ret, f2params, f2ret, equivVars)
       case (ObjectTE(o1v, o1s), ObjectTE(o2v, o2s)) =>
-        (equivVars.addEquivalence(o1v, o2v) &&
-          equivVars.addEquivalence(o1s, o2s))
+        equivVars.addEquivalence(o1v, o2v).flatMap(_.addEquivalence(o1s, o2s))
       case (SolvedObjectTE(ss1, s1), SolvedObjectTE(ss2, s2)) => {
         // TODO
-        false
+        None
       }
-      case _ => false
+      case _ => None
     }
-  }
 
   private def functionsIsomorphic(
     f1params : Seq[EffectTE], 
     f1ret : TypeExpr,
     f2params : Seq[EffectTE],
     f2ret : TypeExpr,
-    equivVars : TVEquivalence)
-    : Boolean = {
+    equivVars : Bijection[TypeVar, TypeVar])
+    : Option[Bijection[TypeVar, TypeVar]] = {
 
     if(f1params.length != f2params.length) {
-      false
+      None
     } else {
       val paramPairs = f1params.zip(f2params)
-      val paramIso = paramPairs.forall { case Pair(eff1, eff2) => {
-        val inIso = isomorphic(eff1.in, eff2.in, equivVars)
-        val outIso = isomorphic(eff1.out, eff2.out, equivVars)
-        inIso && outIso
-      }}
+      val paramIso = 
+        (paramPairs.foldLeft
+          (Option(equivVars))
+          { case (equiv, (eff1, eff2)) =>
+            equiv.flatMap(checkIsomorphic(eff1.in, eff2.in, _)).
+                  flatMap(checkIsomorphic(eff1.out, eff2.out, _))
+          }
+        )
 
-      paramIso && isomorphic(f1ret, f2ret, equivVars)
+      paramIso.flatMap(checkIsomorphic(f1ret, f2ret, _))
     }
   }
 }
