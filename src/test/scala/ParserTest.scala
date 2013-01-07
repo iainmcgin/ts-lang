@@ -82,8 +82,8 @@ class ParserTest extends FunSuite {
     //        ^  semantically invalid but syntactically fine
 
   // parsing precedence of seq and let binding
-  parseTest("let x = \\().unit in x() ; unit",
-    LetBind("x", funv(unitv), seq(FunCall("x", Seq.empty), unitv)))
+  parseTest("let x = \\().unit in x() ; unit ; true",
+    LetBind("x", funv(unitv), seq(FunCall("x", Seq.empty), unitv, truev)))
   parseTest("(let x = unit in unit) ; unit",
     seq(LetBind("x", unitv, unitv), unitv))
 }
