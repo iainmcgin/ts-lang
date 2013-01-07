@@ -94,7 +94,6 @@ object ConstraintGenerator {
       case FunValue(_,body) => allConstraints(body)
       case LetBind(_,value,body) => 
         allConstraints(value) ++ allConstraints(body)
-      case Update(_, body) => allConstraints(body)
       case Sequence(left, right) => 
         allConstraints(left) ++ allConstraints(right)
       case If(cond,thn,els) => 
@@ -132,7 +131,6 @@ object ConstraintGenerator {
       case t : ObjValue   => objectValueConstraints(t)
       case t : FunValue   => funValueConstraints(t)
       case t : LetBind    => letBindConstraints(t)
-      case t : Update     => updateConstraints(t)
       case t : Sequence   => sequenceConstraints(t)
       case t : FunCall    => funCallConstraint(t)
       case t : MethCall   => methCallConstraint(t)
@@ -198,17 +196,6 @@ object ConstraintGenerator {
         ContextRemoval(t.body->outContextVar, t.varName)) +
       EqualityConstraint(VarTE(t->typeVar), VarTE(t.body->typeVar))
     )
-
-  def updateConstraints(t : Update) = {
-    val bodyType = VarTE(t.body->typeVar)
-    (ConstraintSet() +
-      ContextConstraint(t.body->inContextVar, 
-        removeFrom(t->inContextVar, t.varName)) +
-      ContextConstraint(t->outContextVar, 
-        addTo(t.body->outContextVar, t.varName, bodyType)) +
-      EqualityConstraint(VarTE(t->typeVar), UnitTE)
-    )
-  }
 
   def sequenceConstraints(t : Sequence) =
     (ConstraintSet() +
@@ -322,8 +309,6 @@ object ConstraintGenerator {
         printInferenceTree(value, indent + 1)
         printInferenceTree(body, indent + 1)
       }
-      case Update(_, body) =>
-        printInferenceTree(body, indent + 1)
       case Sequence(left, right) => {
         printInferenceTree(left, indent + 1)
         printInferenceTree(right, indent + 1)

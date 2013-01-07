@@ -102,7 +102,6 @@ object TypeChecker {
 
       /* terms */
       case LetBind(_,_,body) => body->ttype
-      case Update(_,_) => UnitType()
       case Sequence(l,r) => r->ttype
       case t @ MethCall(o,m) => 
         ((t->input)(o)) match { 
@@ -117,11 +116,7 @@ object TypeChecker {
       case t @ If(cond,thn,els) => {
         val t1 = thn->ttype
         val t2 = els->ttype
-        t1.join(t2).getOrElse {
-          message(t, "result types of branches are incompatible: %s and %s".
-            format(t1, t2))
-          ErrorType()
-        }
+        t1.join(t2)
       }
     }
 
@@ -144,10 +139,6 @@ object TypeChecker {
         case p @ LetBind(name,value,body) => {
           if (t eq value) p->input
           else value->output + Pair(p.varName,p.value->ttype)
-        }
-        case p @ Update(varName,_) => {
-          val ctx = (p->input) - varName
-          ctx
         }
         case p @ Sequence(left, right) => 
           (if (t eq left) p->input else p.left->output)
@@ -182,7 +173,6 @@ object TypeChecker {
     attr {
       case t : Value => t->input
       case LetBind(varName,valTerm,bodyTerm) => bodyTerm->output - varName
-      case Update(varName,body) => body->output + Pair(varName, body->ttype)
       case t @ MethCall(objName,methName) => methCallOutput(t)
       case Sequence(l,r) => r->output
       case t : FunCall => funCallOutput(t)
@@ -268,9 +258,6 @@ object TypeChecker {
           message(t, err match {
             case DifferentDomains(_, _) =>
               "output domains differ"
-            case MismatchedTypes(varName, t1, t2) =>
-              ("variable %s has incompatible types in the output of " +
-              "the branches: %s and %s") format (varName, t1, t2)
           })
         })
         (t.whenTrue->output).mapValues(_ => ErrorType())
@@ -350,10 +337,6 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
         val termDoc = 
           LET <+> varName <+> "=" <+> valueTermId <+> IN <+> bodyTermId
         Pair(termDoc, Seq(value, body))
-      }
-      case Update(varName, body) => { 
-        val bodyTermId = body->termId
-        Pair(varName <+> ":=" <+> (bodyTermId), Seq(body))
       }
       case MethCall(objVarName, methName) => 
         Pair(objVarName <> "." <> methName, Seq.empty)

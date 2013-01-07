@@ -16,7 +16,6 @@ trait Parser extends org.kiama.util.PositionedParserUtilities {
   lazy val term : PackratParser[Term] =
     (term <~ ";") ~ term                                  ^^ Sequence |
     ("let" ~> ident <~ "=") ~ (subterm <~ "in") ~ term    ^^ LetBind |
-    (ident <~ ":=") ~ subterm                             ^^ Update |
     subterm
 
   lazy val subterm : PackratParser[Term] =

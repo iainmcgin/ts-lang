@@ -98,8 +98,9 @@ class ParserTest extends FunSuite {
   }
 
   test("parse if-then-else with sequences in branches") {
-    checkTerm("if true then (x := unit; y := unit) else (y := unit; x := unit)",
-      If(truev, seq("x" := unitv, "y" := unitv), seq("y" := unitv, "x" := unitv))
+    checkTerm("if true then (x.m; y.n) else (y.n; x.m)",
+      If(truev, seq(MethCall("x", "m"), MethCall("y", "n")), 
+                seq(MethCall("y", "n"), MethCall("x", "m")))
     )
   }
 }

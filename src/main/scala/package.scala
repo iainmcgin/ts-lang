@@ -34,8 +34,6 @@ package object ts {
   sealed abstract class JoinError
   case class DifferentDomains(leftDiff : Set[String], rightDiff : Set[String])
     extends JoinError
-  case class MismatchedTypes(varName : String, t1 : Type, t2 : Type)
-    extends JoinError
 
   def joinContexts(c1 : Context, c2 : Context) : Either[Seq[JoinError],Context] = {
     if(c1.keySet != c2.keySet) {
@@ -44,24 +42,10 @@ package object ts {
       return Left(Seq(DifferentDomains(c1Extra, c2Extra)))
     }
 
-    val (errors, ctx) = (c1.foldLeft
-      (Pair(Seq.empty[JoinError], emptyContext))
-      ((res, p) => {
-        val errors = res._1
-        val ctx = res._2
-        val varName = p._1
-        val varType = p._2
-        val otherType = c2(varName)
-
-        (varType.join(otherType).
-          map(joinedType => Pair(errors, ctx + (varName -> joinedType))).
-          getOrElse(Pair(MismatchedTypes(varName, varType, otherType) +: errors, 
-            ctx))
-        )
-      })
-    )
-
-    if(errors.isEmpty) Right(ctx) else Left(errors)
+    Right(c1.map { case (varName, varType) => 
+      val otherType = c2(varName)
+      varName -> varType.join(otherType)
+    })
   }
 
   /** A typing context, where variables are mapped to type expressions

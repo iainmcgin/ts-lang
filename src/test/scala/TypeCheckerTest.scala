@@ -82,22 +82,6 @@ class TypeCheckerTest extends FunSuite with ShouldMatchers {
     assert(let->output === empty)
   }
 
-  test("update term") {
-    val updateExpr = funv(unitv)
-    val update = Update("x", updateExpr)
-    val value = unitv
-    val let = LetBind("x", value, update)
-    checkType(let, unitt)
-    assert(let->input === Map.empty)
-    assert(let->output === Map.empty)
-    assert(value->ttype === unitt)
-    assert(updateExpr->input === Map.empty)
-    assert(updateExpr->ttype == funt(unitt))
-    assert(updateExpr->output === Map.empty)
-    assert(update->input === Map("x" -> unitt))
-    assert(update->output === Map("x" -> funt(unitt)))
-  }
-
   test("invalid parameter type") {
     val application = FunCall("f", Seq("x"))
     val letParam = LetBind("x", unitv, application)
@@ -116,36 +100,32 @@ class TypeCheckerTest extends FunSuite with ShouldMatchers {
     checkType(ift, boolt)
   }
 
-  test("if-then-else which changes variables") {
-    val ift = If(truev, "x" := truev, "x" := falsev)
-    val let = LetBind("x", unitv, ift)
+  test("if-then-else with different branch effects") {
+    val xObjStates = 
+      Seq(
+        StateDef("S1", 
+          Seq(MethodDef("m", unitv, "S2"), 
+              MethodDef("n", truev, "S2"))),
+        StateDef("S2", Seq.empty)
+      )
 
-    checkType(let, unitt)
-    assert(ift->ttype === unitt)
-    assert(ift.whenTrue->output === Map("x" -> boolt))
-    assert(ift.whenFalse->output === Map("x" -> boolt))
-    assert(ift->output === Map("x" -> boolt))
-  }
+    val xObjTypeStates =
+      Seq(
+        StateSpec("S1",
+          Seq(
+            MethodSpec("m", unitt, "S2"),
+            MethodSpec("n", boolt, "S2")
+          )),
+        StateSpec("S2", Seq.empty)
+      )
 
-  test("if-then-else with incompatible variable changes") {
-    val ift = If(truev, 
-      seq("x" := falsev, "y" := unitv), 
-      seq("x" := unitv, "y" := truev)
-    )
-    val let1 = LetBind("x", unitv, ift)
-    val let2 = LetBind("y", unitv, let1)
+    val xObjStart = ObjValue(xObjStates, "S1")
+    val ift = If(truev, MethCall("x", "m"), MethCall("x", "n"))
+    val let = LetBind("x", xObjStart, ift)
 
-    checkInvalid(let2,
-      "variable x has incompatible types in the output of the branches: " +
-      "Bool and Unit",
-      "variable y has incompatible types in the output of the branches: " +
-      "Unit and Bool")
-  }
-
-  test("if-then-else with incompatible result types") {
-    val ift = If(truev, unitv, truev)
-
-    checkInvalid(ift,
-      "result types of branches are incompatible: Unit and Bool")
+    checkType(let, topt)
+    assert(ift.whenTrue->output === Map("x" -> ObjType(xObjTypeStates, "S2")))
+    assert(ift.whenFalse->output === Map("x" -> ObjType(xObjTypeStates, "S2")))
+    assert(ift->output === Map("x" -> ObjType(xObjTypeStates, "S2")))
   }
 }

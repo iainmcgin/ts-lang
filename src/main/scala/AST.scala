@@ -43,11 +43,6 @@ case class LetBind(varName : String, value : Term, body : Term) extends Term {
     "let " + varName + " = (" + value + ") in (" + body + ")"
 }
 
-case class Update(varName : String, body : Term) extends Term {
-  override def toString =
-    varName + ":= (" + body + ")"
-}
-
 case class MethCall(objVarName : String, methName : String) extends Term {
   override def toString = objVarName + "." + methName
 }
@@ -97,29 +92,33 @@ case class MissingState(
 
 sealed abstract class Type extends Attributable {
   def >>(outType : Type) = EffectType(this, outType)
-  def join(other : Type) : Option[Type] = (this, other) match {
-    case (UnitType(), UnitType()) => Some(UnitType())
-    case (BoolType(), BoolType()) => Some(BoolType())
+  def join(other : Type) : Type = (this, other) match {
+    case (UnitType(), UnitType()) => UnitType()
+    case (BoolType(), BoolType()) => BoolType()
     case (FunType(f1p, f1r), FunType(f2p, f2r)) => {
-      if(f1p.size != f2p.size) None
+      if(f1p.size != f2p.size) TopType()
       else {
-        val retTypeOpt = f1r join f2r
-        val paramTypesOpt = (f1p.zip(f2p).foldRight
-          (Option(Seq.empty[EffectType]))
-          ((paramPair, resOpt) => resOpt.flatMap(res => {
-            val (eff1, eff2) = paramPair
-            (eff1 join eff2) map (_ +: res)
-          }))
-        )
+        val retType = f1r join f2r
+        val paramTypesOpt = 
+          (f1p.zip(f2p).foldRight
+            (Option(Seq.empty[EffectType]))
+            ((paramPair, resOpt) => resOpt.flatMap(res => {
+              val (eff1, eff2) = paramPair
+              (eff1 join eff2) map (_ +: res)
+            }))
+          )
 
-        paramTypesOpt.flatMap(p => retTypeOpt.map(r => FunType(p, r)))
+        val typeOpt = 
+          paramTypesOpt.map(p => FunType(p, retType))
+
+        typeOpt.getOrElse(TopType())
       }
     }
     case (a @ ObjType(_, _), b @ ObjType(_, _)) =>
       a.joinObj(b)
-    case (ErrorType(),_) => Some(ErrorType())
-    case (_, ErrorType()) => Some(ErrorType())
-    case _ => None
+    case (ErrorType(),_) => ErrorType()
+    case (_, ErrorType()) => ErrorType()
+    case _ => TopType()
   }
 
   def meet(other : Type) : Option[Type] = (this, other) match {
@@ -180,9 +179,10 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
   def retType(method : String) = 
     currentState flatMap (s => s.retType(method)) getOrElse ErrorType()
 
-  def joinObj(other : ObjType) : Option[ObjType] = {
-    // TODO
-    None
+  def joinObj(other : ObjType) : ObjType = {
+    // TODO: implement properly
+    if(this == other) this
+    else ObjType(Seq(StateSpec("S", Seq.empty)), "S")
   }
 
   def meetObj(other : ObjType) : Option[ObjType] = {
@@ -206,7 +206,7 @@ case class StateSpec(name : String, methods : Seq[MethodSpec]) {
     (methodMap get method) map ((ms : MethodSpec) => ms.nextState)
   def retType(method : String) = (methodMap get method) map (_.ret)
 
-  override def toString = name + "{ " + methods.mkString("{ ", "; ", " }")
+  override def toString = name + methods.mkString(" { ", "; ", " }")
 }
 
 case class MethodSpec(name : String, ret : Type, nextState : String) {
@@ -218,13 +218,13 @@ case class EffectType(before : Type, after : Type) {
 
   def join(other : EffectType) : Option[EffectType] = {
     val beforeOpt = this.before meet other.before
-    val afterOpt = this.after join other.after
-    beforeOpt.flatMap(b => afterOpt.map(a => EffectType(b, a)))
+    val after = this.after join other.after
+    beforeOpt.map(EffectType(_, after))
   }
 
   def meet(other : EffectType) : Option[EffectType] = {
-    val beforeOpt = this.before join other.before
+    val before = this.before join other.before
     val afterOpt = this.after meet other.after
-    beforeOpt.flatMap(b => afterOpt.map(a => EffectType(b, a)))
+    afterOpt.map(EffectType(before, _))
   }
 }

@@ -44,7 +44,7 @@ class TypeOpTest extends FunSuite with ShouldMatchers {
     }
   }
 
-  val joinOp = (_ : Type).join((_ : Type))
+  val joinOp = (x : Type, y : Type) => Option(x.join(y))
   val meetOp = (_ : Type).meet((_ : Type))
 
   def testJoin(expected : Type, t1 : Type, t2 : Type) {
@@ -64,7 +64,7 @@ class TypeOpTest extends FunSuite with ShouldMatchers {
   }
 
   def testIncompatible(t1 : Type, t2 : Type) {
-    testCannotJoin(t1, t2)
+    testJoin(TopType(), t1, t2)
     testCannotMeet(t1, t2)
   }
 
@@ -94,5 +94,7 @@ class TypeOpTest extends FunSuite with ShouldMatchers {
   testJoin(unitt, unitt, unitt)
   testJoin(boolt, boolt, boolt)
   testJoin(funt(unitt), funt(unitt), funt(unitt))
+
+  testJoin(topt, unitt, boolt)
 
 }

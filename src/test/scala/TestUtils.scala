@@ -35,9 +35,9 @@ object TestUtils {
   def seq(ts : Term*) : Term = {
     ts.reduceRight((t1, t2) => Sequence(t1, t2))
   }
-  def up(name : String, t : Term) = Update(name, t)
 
   /* type short-hand creation */
+  def topt = { TopType() }
   def unitt = { UnitType() }
   def boolt = { BoolType() }
   def funt(retType : Type, paramTypes : EffectType*) =
@@ -54,12 +54,6 @@ object TestUtils {
   /* type inference related helpers */
   implicit def intToVarTE(i : Int) = VarTE(TypeVar(i))
   implicit def intToTypeVar(i : Int) = TypeVar(i)
-
-  case class UpdateHelper(varName : String) {
-    def :=(t : Term) = Update(varName, t)
-  }
-
-  implicit def strToUpdateHelper(str : String) = UpdateHelper(str)
 
   implicit def typeToConstraintBuilder(typ : TypeExpr) = 
     new ConstraintBuilder(typ)
