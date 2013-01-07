@@ -17,27 +17,16 @@ import org.kiama.attribution.Attributable
 
 object ObjectValidator {
 
-  val objectErrors : Attributable => List[MissingState] =
+  val objectErrors : Attributable => Seq[ObjValidationError] =
     attr {
-      case o : ObjValue => {
-        var errors = List.empty[MissingState]
-        if (!o.stateMap.contains(o.state))
-          errors = MissingState(o.state, o, o) :: errors
-
-        o.states.flatMap(_.methods).foreach(m => {
-          if (!o.stateMap.contains(m.nextState)) 
-            errors = MissingState(m.nextState, o, m) :: errors
-        })
-
-        errors
-      }
-      case _ => List.empty[MissingState]
+      case o : ObjValue => o.validate()
+      case o : ObjType => o.validate()
+      case _ => Seq.empty[ObjValidationError]
     }
 
-  def allObjectErrors(a : Attributable) : List[MissingState] =
+  def allObjectErrors(a : Attributable) : Seq[ObjValidationError] =
     (a.children.foldLeft
       (a->objectErrors)
       ((errs, child) => errs ++ allObjectErrors(child))
     )
-
 }

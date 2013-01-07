@@ -42,7 +42,6 @@ class TypeCheckerTest extends FunSuite with ShouldMatchers {
     })
   }
 
-
   val empty = Map.empty[String,Type]
 
   test("unit value type") {

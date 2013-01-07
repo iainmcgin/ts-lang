@@ -92,8 +92,16 @@ object TypeChecker {
         if(objErrors.isEmpty) {
           ObjType(states.map(sSpec _), state)
         } else {
-          objErrors.foreach(err => 
-            message(err.refPoint, "missing state: " + err.state))
+          objErrors.foreach(err => {
+            val msg = err match {
+              case DuplicateState(state) => "duplicate state: " + state
+              case MissingState(state) => "missing state: " + state
+              case DuplicateMethod(state, method) =>
+                "duplicate method in state " + state + ": " + method
+            }
+
+            message(err.refPoint.getOrElse(o), msg)
+          })
           ErrorType()
         }
       }
@@ -389,6 +397,7 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
       val pDocs = params map showEffect
       parens(ssep(pDocs, ",")) <+> "->" <+> showType(ret)
     }
+    case TopType() => "Top"
     case ErrorType() => "BAD"
     case ObjType(states, state) => {
       val sDocs = states map (showStateSpec _)

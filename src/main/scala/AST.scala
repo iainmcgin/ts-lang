@@ -31,6 +31,29 @@ case class ObjValue(states : Seq[StateDef], state : String) extends Value {
       ((m, s) => m + (s.name -> s))
     )
 
+  def validate() : Seq[ObjValidationError] = {
+    var errors = Seq.empty[ObjValidationError]
+    def checkExists(s : String, from : SourceElement) = {
+      if(!stateMap.contains(s)) errors +:= MissingState(s)(Some(from))
+    }
+
+    states.groupBy(_.name).foreach { case (state,dups) =>
+      if(dups.size > 1) errors +:= DuplicateState(state)(Some(dups.head))
+    }
+
+    checkExists(state, this)
+    states.foreach(state => {
+      
+      state.methods.groupBy(_.name).foreach { case (method, dups) =>
+        if(dups.size > 1) 
+          errors +:= DuplicateMethod(state.name, method)(Some(dups.head))
+      }
+
+      state.methods.foreach(method => checkExists(method.nextState, method))
+    })
+    errors
+  }
+
   override def toString = states.mkString("{", " ", "}") + "@" + state
 }
 
@@ -83,14 +106,17 @@ case class ParamDef(name : String, typeInfo : Option[EffectType])
 case class ErrorValue() extends Value
 
 /* validation errors */
-case class MissingState(
-  state : String, 
-  objValue : ObjValue, 
-  refPoint : SourceElement)
+sealed abstract class ObjValidationError {
+  val refPoint : Option[SourceElement]
+}
+case class DuplicateState(state : String)(val refPoint : Option[SourceElement] = None) extends ObjValidationError
+case class MissingState(state : String)(val refPoint : Option[SourceElement] = None) extends ObjValidationError
+case class DuplicateMethod(state : String, method : String)(val refPoint : Option[SourceElement] = None) extends ObjValidationError
+
 
 /* types */
 
-sealed abstract class Type extends Attributable {
+sealed abstract class Type extends SourceElement {
   def >>(outType : Type) = EffectType(this, outType)
   def join(other : Type) : Type = (this, other) match {
     case (UnitType(), UnitType()) => UnitType()
@@ -169,12 +195,12 @@ case class FunType(params : Seq[EffectType], ret : Type) extends Type {
 case class ErrorType() extends Type
 
 case class ObjType(states : Seq[StateSpec], state : String) extends Type {
-  val stateMap : Map[String,StateSpec] =
+  lazy val stateMap : Map[String,StateSpec] =
     (states.foldLeft
       (Map.empty[String,StateSpec])
       ((map,state) => map + Pair(state.name, state)))
 
-  val currentState = stateMap get state
+  lazy val currentState = stateMap get state
     
   def retType(method : String) = 
     currentState flatMap (s => s.retType(method)) getOrElse ErrorType()
@@ -183,6 +209,29 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
     // TODO: implement properly
     if(this == other) this
     else ObjType(Seq(StateSpec("S", Seq.empty)), "S")
+  }
+
+  def validate() : Seq[ObjValidationError] = {
+    var errors = Seq.empty[ObjValidationError]
+    def checkExists(s : String, from : SourceElement) = {
+      if(!stateMap.contains(s)) errors +:= MissingState(s)(Some(from))
+    }
+
+    states.groupBy(_.name).foreach { case (state,dups) =>
+      if(dups.size > 1) errors +:= DuplicateState(state)(Some(dups.head))
+    }
+
+    checkExists(state, this)
+    states.foreach(state => {
+      
+      state.methods.groupBy(_.name).foreach { case (method, dups) =>
+        if(dups.size > 1) 
+          errors +:= DuplicateMethod(state.name, method)(Some(dups.head))
+      }
+
+      state.methods.foreach(method => checkExists(method.nextState, method))
+    })
+    errors
   }
 
   def meetObj(other : ObjType) : Option[ObjType] = {
@@ -195,7 +244,7 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
 
 /* type fragments */
 
-case class StateSpec(name : String, methods : Seq[MethodSpec]) {
+case class StateSpec(name : String, methods : Seq[MethodSpec]) extends SourceElement {
   val methodMap : Map[String,MethodSpec] =
     methods.foldLeft(
       Map.empty[String,MethodSpec])(
@@ -209,11 +258,11 @@ case class StateSpec(name : String, methods : Seq[MethodSpec]) {
   override def toString = name + methods.mkString(" { ", "; ", " }")
 }
 
-case class MethodSpec(name : String, ret : Type, nextState : String) {
+case class MethodSpec(name : String, ret : Type, nextState : String) extends SourceElement {
   override def toString = name + " : " + ret + " ⇒ " + nextState
 }
 
-case class EffectType(before : Type, after : Type) {
+case class EffectType(before : Type, after : Type) extends SourceElement {
   override def toString = before + " ≫ " + after
 
   def join(other : EffectType) : Option[EffectType] = {

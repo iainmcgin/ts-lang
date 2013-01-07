@@ -39,7 +39,7 @@ class ParserTest extends FunSuite {
   parseTest("\\(x : Unit >> Unit).unit", funv(unitv, p("x", unitt >> unitt)))
   parseTest("\\(x : Bool >> Bool).unit", funv(unitv, p("x", boolt >> boolt)))
   parseTest("\\(x : Top >> Top).unit", funv(unitv, p("x", topt >> topt)))
-  parseTest("\\(x : {S{a : Unit >> S}}@S >> {S{a : Unit >> S}}@S).unit", {
+  parseTest("\\(x : {S{a : Unit => S}}@S >> {S{a : Unit => S}}@S).unit", {
     val objType = 
       ObjType(Seq(StateSpec("S", Seq(MethodSpec("a", unitt, "S")))), "S")
     funv(unitv, p("x", objType >> objType))

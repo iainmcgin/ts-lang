@@ -54,11 +54,15 @@ trait Parser extends org.kiama.util.PositionedParserUtilities {
     ("Top" | "⊤") ^^ (_ => TopType())
 
   lazy val statespec : PackratParser[StateSpec] =
-    (ident <~ "{") ~ rep(methodspec) <~ "}" ^^ StateSpec
+    (ident <~ "{") ~ repsep(methodspec, ";") <~ "}" ^^ StateSpec
 
   lazy val methodspec : PackratParser[MethodSpec] =
-    (ident <~ ":") ~ (typespec <~ ">>") ~ ident ^^ MethodSpec
+    (ident <~ ":") ~ (typespec <~ "=>") ~ ident ^^ MethodSpec
 
   def ident: Parser[String] =
     """[a-zA-Z_]\w*""".r
+
+  def checkObj(obj : ObjType) = {
+    obj.validate
+  }
 }
