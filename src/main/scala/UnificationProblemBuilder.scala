@@ -88,7 +88,7 @@ class UnificationProblemBuilder {
           case (te1, te2) => {
             val (mt1, vmt1) = typeToMultiTerm(te1)
             val (mt2, vmt2) = typeToMultiTerm(te2)
-            val merged = MultiEquation(0, Set.empty, Some(mt1.merge(Some(mt2))))
+            val merged = MultiEquation(Set.empty, Some(mt1.merge(Some(mt2))))(0)
 
             log.debug("eq = " + merged)
 
@@ -133,7 +133,7 @@ class UnificationProblemBuilder {
 
     val (eq, varsInEq) = eqsByVar.getOrElse(v, emptyEq(v))
     val (multiTerm,varsInMultiTerm) = typeToMultiTerm(te)
-    val newEq = MultiEquation(0, Set(getVarSpec(v)), Some(multiTerm))
+    val newEq = MultiEquation(Set(getVarSpec(v)), Some(multiTerm))(0)
     val merged = Pair(newEq.merge(eq), varsInMultiTerm ++ varsInEq)
 
     log.debug("eq = " + merged._1)
@@ -145,7 +145,7 @@ class UnificationProblemBuilder {
   }
 
   private def emptyEq(v : TypeVar) : EqWithRefs = 
-    Pair(MultiEquation(0, Set(getVarSpec(v)), None),Set.empty[TypeVar])
+    Pair(MultiEquation(Set(getVarSpec(v)), None)(0),Set.empty[TypeVar])
 
   private def fixReferenceCount(
     vs : Set[TypeVar], 
@@ -157,11 +157,11 @@ class UnificationProblemBuilder {
         val newEq = m2.get(v) match {
           case None => 
             Pair(
-              MultiEquation(max(0, d), Set(getVarSpec(v)), None), 
+              MultiEquation(Set(getVarSpec(v)), None)(max(0, d)), 
               Set.empty[TypeVar]
             )
-          case Some(Pair(MultiEquation(c, s, m),refs)) => 
-            Pair(MultiEquation(c + d, s, m), refs)
+          case Some(Pair(meq @ MultiEquation(s, m),refs)) => 
+            Pair(MultiEquation(s, m)(meq.counter + d), refs)
         }
         pointVarsToEq(m2, newEq)
       })

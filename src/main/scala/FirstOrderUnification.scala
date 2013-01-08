@@ -37,30 +37,33 @@ case class MultiTerm(fn : Int, var args : List[TempMultiEquation]) {
   override def toString = "F" + fn + "(" + args.mkString(", ") + ")"
 }
 
-case class MultiEquation(
-  var counter : Int,
-  var s : Set[Variable],
-  var m : Option[MultiTerm]) {
+case class MultiEquation(var s : Set[Variable], var m : Option[MultiTerm])
+                        (var counter : Int) {
 
   def merge(other : MultiEquation) : MultiEquation =
     if(this == other) {
       this
     } else {
       val merged = MultiEquation(
-        this.counter + other.counter, 
         this.s ++ other.s, 
-        this.m.map(_.merge(other.m)).orElse(other.m)
-      )
+        this.m.map(_.merge(other.m)).orElse(other.m))(
+        this.counter + other.counter)
       merged.s.foreach(v => { v.m = merged })
       merged
     }
 
-  override def equals(o : Any) = o match {
-    case MultiEquation(_,s2,m2) => s == s2 && m == m2
-  }
-
   override def toString =
     "[" + counter + "] {" + s.mkString(", ") + "} = " + m.map(_.toString).getOrElse("∅")
+}
+
+object MultiEquation {
+
+  /**
+   * alternative "constructor" for case class with the old signature, to avoid
+   * changing all the existing test code
+   */
+  def apply(counter : Int, s : Set[Variable], m : Option[MultiTerm]) : MultiEquation = 
+    MultiEquation(s, m)(counter)
 }
 
 case class TempMultiEquation(
