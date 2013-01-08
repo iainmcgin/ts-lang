@@ -53,7 +53,7 @@ class UnificationProblemBuilder {
 
   private def getVarSpec(tv : TypeVar) = {
     if(!vars.contains(tv)) {
-      vars = vars.updated(tv, Variable(tv.v, null))
+      vars = vars.updated(tv, Variable(tv.v)(null))
     }
     vars(tv)
   }

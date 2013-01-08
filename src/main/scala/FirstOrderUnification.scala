@@ -81,14 +81,8 @@ case class TempMultiEquation(
 }
 
 /** !!! cyclic references between meqs and vars. Need to unroll somehow */
-case class Variable(val num : Int, var m : MultiEquation) {
-
+case class Variable(val num : Int)(var m : MultiEquation) {
   override def toString = "v" + num
-  override def equals(o : Any) = o match { 
-    case Variable(num2,_) => num == num2
-    case _ => false
-  }
-  override def hashCode = num.hashCode
 }
 
 /**

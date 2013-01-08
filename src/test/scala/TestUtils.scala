@@ -47,7 +47,7 @@ object TestUtils {
   /* unification related helpers */
   val unitMT = MultiTerm(0, List.empty)
 
-  def v(tv : TypeVar) = Variable(tv.v, null)
+  def v(tv : TypeVar) = Variable(tv.v)(null)
   def vset(tvs : TypeVar*) = Set(tvs.map(tv => v(tv)) :_*)
 
 
