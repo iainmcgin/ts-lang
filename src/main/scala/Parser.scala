@@ -49,7 +49,7 @@ trait Parser extends org.kiama.util.PositionedParserUtilities {
   lazy val typespec : PackratParser[Type] =
     "Unit" ^^ (_ => UnitType()) |
     "Bool" ^^ (_ => BoolType()) |
-    ("{" ~> rep1(statespec) <~ "}" <~ "@") ~ ident ^^ ObjType |
+    ("{" ~> rep1(statespec) <~ "}" <~ "@") ~ stateset ^^ { case ~(a, b) => ObjType(a, b) } |
     ("(" ~> repsep(effectType, ",") <~ "->") ~ typespec ^^ FunType |
     ("Top" | "⊤") ^^ (_ => TopType())
 
@@ -58,6 +58,11 @@ trait Parser extends org.kiama.util.PositionedParserUtilities {
 
   lazy val methodspec : PackratParser[MethodSpec] =
     (ident <~ ":") ~ (typespec <~ "=>") ~ ident ^^ MethodSpec
+
+  lazy val stateset : PackratParser[Set[String]] =
+    ident ^^ (i => Set(i)) |
+    "{" ~> rep1sep(ident, ",") <~ "}" ^^ (_.toSet)
+
 
   def ident: Parser[String] =
     """[a-zA-Z_]\w*""".r

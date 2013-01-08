@@ -134,14 +134,14 @@ sealed abstract class Type extends SourceElement {
    * Top (⊤) is a supertype of everything.
    */
   def join(other : Type) : Type = (this, other) match {
+    case (ErrorType(), _) => ErrorType()
+    case (_, ErrorType()) => ErrorType()
     case (TopType(), _) => TopType()
     case (_, TopType()) => TopType()
     case (UnitType(), UnitType()) => UnitType()
     case (BoolType(), BoolType()) => BoolType()
     case (a @ FunType(_, _), b @ FunType(_, _)) => a.joinFun(b)
     case (a @ ObjType(_, _), b @ ObjType(_, _)) => a.joinObj(b)
-    case (ErrorType(), _) => ErrorType()
-    case (_, ErrorType()) => ErrorType()
     case _ => TopType()
   }
 
@@ -211,23 +211,26 @@ case class FunType(params : Seq[EffectType], ret : Type) extends Type {
 
 case class ErrorType() extends Type
 
-case class ObjType(states : Seq[StateSpec], state : String) extends Type {
+
+/**
+ * Object types, which are composed of a finite set of states with
+ * deterministic transitions, and a current state set. A real object value
+ * of this type will have precisely one current state; the state set is used
+ * to capture runtime non-determinism in the type system.
+ */
+case class ObjType(states : Seq[StateSpec], currentStateSet : Set[String]) extends Type {
+
   lazy val stateMap : Map[String,StateSpec] =
     (states.foldLeft
       (Map.empty[String,StateSpec])
       ((map,state) => map + Pair(state.name, state)))
-
-  lazy val currentState = stateMap get state
-    
-  def retType(method : String) = 
-    currentState flatMap (s => s.retType(method)) getOrElse ErrorType()
-
-  def joinObj(other : ObjType) : ObjType = {
-    // TODO: implement properly
-    if(this == other) this
-    else ObjType(Seq(StateSpec("S", Seq.empty)), "S")
-  }
-
+  
+  /**
+   * Checks that the object type is free of the following errors:
+   * - duplicate state specifications
+   * - duplicate methods within state specifications
+   * - references to missing state specifications
+   */
   def validate() : Seq[ObjValidationError] = {
     var errors = Seq.empty[ObjValidationError]
     def checkExists(s : String, from : SourceElement) = {
@@ -238,7 +241,7 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
       if(dups.size > 1) errors +:= DuplicateState(state)(Some(dups.head))
     }
 
-    checkExists(state, this)
+    currentStateSet.foreach(checkExists(_, this))
     states.foreach(state => {
       
       state.methods.groupBy(_.name).foreach { case (method, dups) =>
@@ -251,13 +254,67 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
     errors
   }
 
+  /**
+   * Determines the effective return type of the specified method if it
+   * were to be called with the current state set. If one or more of the
+   * current states does not allow the specified method, ErrorType is
+   * returned.
+   */
+  def retType(method : String) : Type =
+      (currentStateSet.foldLeft
+      (Option.empty[Type])
+      { (res, stateName) =>
+        val stateOpt = stateMap.get(stateName)
+        val methodRetOpt = stateOpt.flatMap(_.retType(method))
+        val methodRet = methodRetOpt.getOrElse(ErrorType())
+
+        res.map(_ join methodRet).orElse(Some(methodRet))
+      }).getOrElse(ErrorType())
+
+  /**
+   * Determines the successor state set of the specified method were to be
+   * called. If one or more of the states in the current state set does not
+   * allow the specified method, None is returned.
+   */
+  def nextStateSet(method : String) : Option[Set[String]] =
+    (currentStateSet.foldLeft
+      (Option(Set.empty[String]))
+      { (res, stateName) =>
+        val stateOpt = stateMap.get(stateName)
+        val methodNextOpt = stateOpt.flatMap(_.nextState(method))
+
+        methodNextOpt.flatMap(next => res.map(_ + next))
+      }
+    )
+
+  def joinObj(other : ObjType) : ObjType = {
+    // TODO: implement properly
+    if(this == other) this
+    else ObjType(Seq(StateSpec("S", Seq.empty)), "S")
+  }
+
   def meetObj(other : ObjType) : Option[ObjType] = {
     // TODO: implement properly
     if(this == other) Some(this)
     else None
   }
 
-  override def toString = states.mkString("{ ", " ", " }@") + state
+  override def toString = {
+    val body = states.mkString("{ ", " ", " }@")
+    if(currentStateSet.size == 1)
+      body + currentStateSet.head
+    else 
+      body + currentStateSet.mkString("{ ", ", ", " }")
+  }
+}
+
+object ObjType {
+  /**
+   * alternative "constructor" for ObjType where the object is known to be
+   * in a single state.
+   */
+  def apply(states : Seq[StateSpec], currentState : String) : ObjType =
+    ObjType(states, Set(currentState))
 }
 
 /* type fragments */
@@ -269,9 +326,12 @@ case class StateSpec(name : String, methods : Seq[MethodSpec]) extends SourceEle
       (map,meth) => map + Pair(meth.name, meth))
 
   def hasMethod(method : String) = methodMap contains method
-  def nextState(method : String) = 
+  
+  def nextState(method : String) : Option[String] = 
     (methodMap get method) map ((ms : MethodSpec) => ms.nextState)
-  def retType(method : String) = (methodMap get method) map (_.ret)
+
+  def retType(method : String) : Option[Type] = 
+    (methodMap get method) map (_.ret)
 
   override def toString = name + methods.mkString(" { ", "; ", " }")
 }

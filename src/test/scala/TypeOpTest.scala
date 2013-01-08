@@ -126,4 +126,10 @@ class TypeOpTest extends FunSuite with ShouldMatchers {
   testMeet(funt(unitt), funt(unitt), topt)
   testMeet(emptyObj, emptyObj, topt)
 
+  // error types
+  testJoin(ErrorType(), topt, ErrorType())
+  testJoin(ErrorType(), boolt, ErrorType())
+  testJoin(ErrorType(), funt(unitt), ErrorType())
+  testJoin(ErrorType(), emptyObj, ErrorType())
+
 }

@@ -194,15 +194,10 @@ object TypeChecker {
         ErrorType()
       }
       case Some(o @ ObjType(states,_)) => {
-        val nextState = o.currentState flatMap (s => s.nextState(t.methName))
-        nextState match {
-          case None => {
-            message(t, "attempt to call unavailable method %s on receiver %s of type %s".format(t.methName, t.objVarName, o))
-            ErrorType()
-          }
-          case Some(state) => {
-            ObjType(states, state)
-          }
+        val nextStateSet = o.nextStateSet(t.methName)
+        nextStateSet.map(ObjType(states, _)).getOrElse {
+          message(t, "attempt to call unavailable method %s on receiver %s of type %s".format(t.methName, t.objVarName, o))
+          ErrorType()
         }
       }
       case Some(ErrorType()) => ErrorType()
@@ -399,10 +394,16 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
     }
     case TopType() => "Top"
     case ErrorType() => "BAD"
-    case ObjType(states, state) => {
+    case ObjType(states, currentStateSet) => {
       val sDocs = states map (showStateSpec _)
-      braces(space <> nest(fillsep(sDocs, space)) <> line) <> "@" <> state
+      (braces(space <> nest(fillsep(sDocs, space)) <> line) <> 
+        "@" <> showStateSet(currentStateSet))
     }
+  }
+
+  def showStateSet(states : Set[String]) = {
+    if(states.size == 1) text(states.head)
+    else braces(lsep(states.map(text(_)).toSeq, ","))
   }
 
   def showStateSpec(s : StateSpec) = {
