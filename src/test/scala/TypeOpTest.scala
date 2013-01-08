@@ -17,7 +17,6 @@ import TestUtils._
 
 class TypeOpTest extends FunSuite with ShouldMatchers {
 
-
   def opTest(expected : Type, 
     t1 : Type, 
     t2 : Type,
@@ -64,7 +63,7 @@ class TypeOpTest extends FunSuite with ShouldMatchers {
   }
 
   def testIncompatible(t1 : Type, t2 : Type) {
-    testJoin(TopType(), t1, t2)
+    testJoin(topt, t1, t2)
     testCannotMeet(t1, t2)
   }
 
@@ -78,23 +77,53 @@ class TypeOpTest extends FunSuite with ShouldMatchers {
   testIncompatible(boolt, emptyObj)
   testIncompatible(funt(unitt), emptyObj)
 
+  
   // mismatched parameter lengths
   testIncompatible(funt(unitt), funt(unitt, unitt >> unitt))
 
-  // incompatible return types
-  testIncompatible(funt(unitt), funt(boolt))
+  // mismatched return types
+  testJoin(funt(topt), funt(unitt), funt(boolt))
+  testCannotMeet(funt(unitt), funt(boolt))
 
-  // incompatible output type on effect
-  testIncompatible(funt(unitt, unitt >> unitt), funt(unitt, unitt >> boolt))
+  // mismatched output type on effect
+  testJoin(funt(unitt, unitt >> topt), 
+           funt(unitt, unitt >> unitt), 
+           funt(unitt, unitt >> boolt))
 
-  // incompatible input type on effect
-  testIncompatible(funt(unitt, unitt >> unitt), funt(unitt, boolt >> unitt))
+  testCannotMeet(funt(unitt, unitt >> unitt), funt(unitt, unitt >> boolt))
+
+  // mismatched input type on effect
+  testJoin(topt, funt(unitt, unitt >> unitt), funt(unitt, boolt >> unitt))
+  testMeet(funt(unitt, topt >> unitt),
+           funt(unitt, unitt >> unitt), 
+           funt(unitt, boolt >> unitt))
+
 
   // join with self
   testJoin(unitt, unitt, unitt)
   testJoin(boolt, boolt, boolt)
   testJoin(funt(unitt), funt(unitt), funt(unitt))
+  testJoin(emptyObj, emptyObj, emptyObj)
+  testJoin(topt, topt, topt)
 
-  testJoin(topt, unitt, boolt)
+  // meet with self
+  testMeet(unitt, unitt, unitt)
+  testMeet(boolt, boolt, boolt)
+  testMeet(funt(unitt), funt(unitt), funt(unitt))
+  testMeet(emptyObj, emptyObj, emptyObj)
+  testMeet(topt, topt, topt)
+
+
+  // join with top is always top
+  testJoin(topt, unitt, topt)
+  testJoin(topt, boolt, topt)
+  testJoin(topt, funt(unitt), topt)
+  testJoin(topt, emptyObj, topt)
+
+  // meet with top
+  testMeet(unitt, unitt, topt)
+  testMeet(boolt, boolt, topt)
+  testMeet(funt(unitt), funt(unitt), topt)
+  testMeet(emptyObj, emptyObj, topt)
 
 }

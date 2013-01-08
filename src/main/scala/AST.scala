@@ -14,6 +14,7 @@ package uk.ac.gla.dcs.ts
 import org.kiama.attribution.Attributable
 import org.kiama.util.Positioned
 
+/** standard trait for anything that appears in source code */
 trait SourceElement extends Attributable with Positioned
 
 /* terms */
@@ -105,71 +106,55 @@ case class ParamDef(name : String, typeInfo : Option[EffectType])
 
 case class ErrorValue() extends Value
 
-/* validation errors */
+/* object validation errors */
 sealed abstract class ObjValidationError {
   val refPoint : Option[SourceElement]
 }
-case class DuplicateState(state : String)(val refPoint : Option[SourceElement] = None) extends ObjValidationError
-case class MissingState(state : String)(val refPoint : Option[SourceElement] = None) extends ObjValidationError
-case class DuplicateMethod(state : String, method : String)(val refPoint : Option[SourceElement] = None) extends ObjValidationError
+
+case class DuplicateState(state : String)
+                         (val refPoint : Option[SourceElement] = None) 
+                         extends ObjValidationError
+
+case class MissingState(state : String)
+                       (val refPoint : Option[SourceElement] = None) 
+                       extends ObjValidationError
+
+case class DuplicateMethod(state : String, method : String)
+                          (val refPoint : Option[SourceElement] = None) 
+                          extends ObjValidationError
 
 
 /* types */
 
 sealed abstract class Type extends SourceElement {
   def >>(outType : Type) = EffectType(this, outType)
+
+  /**
+   * Calculates the join of two types. This is always defined, as the type
+   * Top (⊤) is a supertype of everything.
+   */
   def join(other : Type) : Type = (this, other) match {
+    case (TopType(), _) => TopType()
+    case (_, TopType()) => TopType()
     case (UnitType(), UnitType()) => UnitType()
     case (BoolType(), BoolType()) => BoolType()
-    case (FunType(f1p, f1r), FunType(f2p, f2r)) => {
-      if(f1p.size != f2p.size) TopType()
-      else {
-        val retType = f1r join f2r
-        val paramTypesOpt = 
-          (f1p.zip(f2p).foldRight
-            (Option(Seq.empty[EffectType]))
-            ((paramPair, resOpt) => resOpt.flatMap(res => {
-              val (eff1, eff2) = paramPair
-              (eff1 join eff2) map (_ +: res)
-            }))
-          )
-
-        val typeOpt = 
-          paramTypesOpt.map(p => FunType(p, retType))
-
-        typeOpt.getOrElse(TopType())
-      }
-    }
-    case (a @ ObjType(_, _), b @ ObjType(_, _)) =>
-      a.joinObj(b)
-    case (ErrorType(),_) => ErrorType()
+    case (a @ FunType(_, _), b @ FunType(_, _)) => a.joinFun(b)
+    case (a @ ObjType(_, _), b @ ObjType(_, _)) => a.joinObj(b)
+    case (ErrorType(), _) => ErrorType()
     case (_, ErrorType()) => ErrorType()
     case _ => TopType()
   }
 
+  /**
+   * Calculates the meet of two types, if this is defined.
+   */
   def meet(other : Type) : Option[Type] = (this, other) match {
+    case (TopType(), x) => Some(x)
+    case (x, TopType()) => Some(x)
     case (UnitType(), UnitType()) => Some(UnitType())
     case (BoolType(), BoolType()) => Some(BoolType())
-    case (FunType(f1p, f1r), FunType(f2p, f2r)) => {
-      if(f1p.size != f2p.size) None
-      else {
-        val retTypeOpt = f1r meet f2r
-        val paramTypesOpt = (f1p.zip(f2p).foldRight
-          (Option(Seq.empty[EffectType]))
-          ((paramPair, resOpt) => resOpt.flatMap(res => {
-            val (eff1, eff2) = paramPair
-            (eff1 meet eff2) map (_ +: res)
-          }))
-        )
-
-        paramTypesOpt.flatMap(p => retTypeOpt.map(r => FunType(p, r)))
-      }
-    }
-
-    case (a @ ObjType(_,_), b @ ObjType(_,_)) => {
-      a.meetObj(b)
-    }
-
+    case (a @ FunType(_,_), b @ FunType(_,_)) => a.meetFun(b)
+    case (a @ ObjType(_,_), b @ ObjType(_,_)) => a.meetObj(b)
     case (ErrorType(),_) => Some(ErrorType())
     case (_,ErrorType()) => Some(ErrorType())
     case _ => None
@@ -189,6 +174,38 @@ case class BoolType() extends Type {
 }
 
 case class FunType(params : Seq[EffectType], ret : Type) extends Type {
+
+  def joinFun(other : FunType) : Type = {
+    if(this.params.size != other.params.size) return TopType()
+    
+    val retType = this.ret join other.ret
+    val paramTypesOpt = 
+      (this.params.zip(other.params).foldRight
+        (Option(Seq.empty[EffectType]))
+        ((paramPair, resOpt) => resOpt.flatMap(res => {
+          val (eff1, eff2) = paramPair
+          (eff1 join eff2) map (_ +: res)
+        }))
+      )
+
+    paramTypesOpt.map(FunType(_, retType)).getOrElse(TopType())
+  }
+
+  def meetFun(other : FunType) : Option[Type] = {
+    if(this.params.size != other.params.size) return None
+
+    val retTypeOpt = this.ret meet other.ret
+    val paramTypesOpt = (this.params.zip(other.params).foldRight
+      (Option(Seq.empty[EffectType]))
+      ((paramPair, resOpt) => resOpt.flatMap(res => {
+        val (eff1, eff2) = paramPair
+        (eff1 meet eff2) map (_ +: res)
+      }))
+    )
+
+    paramTypesOpt.flatMap(p => retTypeOpt.map(r => FunType(p, r)))
+  }
+
   override def toString = "(" + params.mkString(",") + ") → " + ret
 }
 
@@ -235,8 +252,9 @@ case class ObjType(states : Seq[StateSpec], state : String) extends Type {
   }
 
   def meetObj(other : ObjType) : Option[ObjType] = {
-    // TODO
-    None
+    // TODO: implement properly
+    if(this == other) Some(this)
+    else None
   }
 
   override def toString = states.mkString("{ ", " ", " }@") + state
