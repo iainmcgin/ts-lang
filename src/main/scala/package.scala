@@ -28,9 +28,18 @@ package object ts {
   def asSubscript(num : Int) : String = 
     num.toString.map(c => (c - '0' + 0x2080).toChar)
 
-  /** A typing context, which consists of variable names mapped to types */
-  type Context = Map[String,Type]
+  /** A typing context, which consists of variable names mapped to an
+    * optional type. If the variable has no type, this means a previous
+    * type error occurred in relation to the variable.
+    */
+  type Context = Map[String,Option[Type]]
 
+  /**
+   * A single variable to type mapping from a context.
+   */
+  type ContextEntry = (String,Option[Type])
+
+  
   sealed abstract class JoinError
   case class DifferentDomains(leftDiff : Set[String], rightDiff : Set[String])
     extends JoinError
@@ -42,9 +51,9 @@ package object ts {
       return Left(Seq(DifferentDomains(c1Extra, c2Extra)))
     }
 
-    Right(c1.map { case (varName, varType) => 
-      val otherType = c2(varName)
-      varName -> varType.join(otherType)
+    Right(c1.map { case (varName, varTypeOpt) => 
+      val otherTypeOpt = c2(varName)
+      varName -> Type.joinOpt(varTypeOpt, otherTypeOpt)
     })
   }
 
@@ -74,8 +83,7 @@ package object ts {
     )
   }
 
-  /** an empty context, which maps all variable names to ErrorType */
-  val emptyContext : Context = Map.empty.withDefaultValue(ErrorType())
+  val emptyContext : Context = Map.empty
 
   val unitTy = UnitType()
   def funTy(ret : Type, params : EffectType*) = FunType(params, ret)
@@ -103,4 +111,41 @@ package object ts {
   class ContextVarGenerator extends Counter[ContextVar] {
     def next() = ContextVar(step())
   }
+
+  /* some basic utility functions */
+
+  def reduceSeqOpt[X, Y >: X]
+      (seqOpt : Seq[Option[X]])
+      (f : (Y, Y) => Option[Y]) 
+      : Option[Y] =
+    seqOpt.reduce[Option[Y]] { (aOpt,bOpt) => 
+      aOpt.flatMap(a => bOpt.flatMap(f(a,_)))
+    }
+
+  def reduceSeqOpt2[X, Y >: X]
+      (seqOpt : Seq[Option[X]])
+      (f : (Y, Y) => Y) 
+      : Option[Y] =
+    seqOpt.reduce[Option[Y]] { (aOpt, bOpt) => 
+      aOpt.flatMap(a => bOpt.map(f(a,_))) 
+    }
+
+  def reduceSeq[X, Y >: X]
+      (seq : Seq[X])
+      (f : (Y, Y) => Option[Y]) 
+      : Option[Y] =
+    if(seq.isEmpty) None
+    else seq.tail.foldLeft(Option[Y](seq.head)) { (resOpt, x) => 
+      resOpt.flatMap(f(_,x)) 
+    }
+
+  def mapAllOrNone[X,Y]
+      (seq : Seq[X])
+      (f : X => Option[Y])
+      : Option[Seq[Y]] =
+    (seq.foldLeft
+      (Option(Seq.empty[Y]))
+      { (resOpt, x) => resOpt.flatMap(res => f(x).map(res :+ _)) }
+    )
+
 }

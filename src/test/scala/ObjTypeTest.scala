@@ -32,17 +32,17 @@ class ObjTypeTest extends FunSuite with ShouldMatchers {
 
   test("return type with single known current state") {
     val obj = ObjType(o1states, Set("A"))
-    (obj.retType("m")) should be (unitt)
-    (obj.retType("n")) should be (boolt)
-    (obj.retType("f")) should be  (ErrorType())
+    (obj.retType("m")) should be (Some(unitt))
+    (obj.retType("n")) should be (Some(boolt))
+    (obj.retType("f")) should be (None)
   }
 
   test("return type with state set") {
     val obj = ObjType(o1states, Set("A", "B"))
-    (obj.retType("m")) should be (topt)
-    (obj.retType("n")) should be (ErrorType())
-    (obj.retType("f")) should be (ErrorType())
-    (obj.retType("g")) should be (funt(topt))
+    (obj.retType("m")) should be (Some(topt))
+    (obj.retType("n")) should be (None)
+    (obj.retType("f")) should be (None)
+    (obj.retType("g")) should be (Some(funt(topt)))
   }
 
   test("nextStateSet with single known current state") {

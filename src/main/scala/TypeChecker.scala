@@ -19,11 +19,23 @@ import ObjectValidator._
 
 object TypeChecker {
 
-  def mSpec(mdef : MethodDef) = 
-    MethodSpec(mdef.name, mdef.ret->ttype, mdef.nextState)
+  def mSpec(mdef : MethodDef) : Option[MethodSpec] = 
+    (mdef.ret->ttype).map { retType => 
+      MethodSpec(mdef.name, retType, mdef.nextState)
+    }
 
-  def sSpec(sdef : StateDef) = 
-    StateSpec(sdef.name, sdef.methods.map(mSpec _))
+  def sSpec(sdef : StateDef) : Option[StateSpec] = {
+    val methodSpecsOpt = 
+      mapAllOrNone(sdef.methods)(mSpec _)
+      // (sdef.methods.foldLeft
+      //   (Option(Seq.empty[MethodSpec]))
+      //   { (resOpt, mdef) => 
+      //     resOpt.flatMap(res => mSpec(mdef).map(res :+ _))
+      //   }
+      // )
+
+    methodSpecsOpt.map(StateSpec(sdef.name, _))
+  }
 
   val infer : Term => Option[Tuple3[Context, Type, Context]] =
     attr {
@@ -44,32 +56,30 @@ object TypeChecker {
     })
   }
 
-  def inferredParamEffect(paramName : String) : FunValue => EffectType =
+  def inferredParamEffect(paramName : String) : FunValue => Option[EffectType] =
     attr {
       case t : FunValue => {
         val pNum = t.params.indexWhere(_.name == paramName)
         inferFunType(t).map(ft => {
           ft.params(pNum)
-        }).getOrElse(ErrorType() >> ErrorType())
+        })
       }
     }
 
   /** determines the effect type for a parameter */
-  val pEffect : ParamDef => EffectType =
+  val pEffect : ParamDef => Option[EffectType] =
     childAttr {
       case p @ ParamDef(name, typeInfo) => {
         case f @ FunValue(params, body) => 
-          typeInfo getOrElse (f->inferredParamEffect(name))
+          typeInfo orElse (f->inferredParamEffect(name))
       }
     }
 
-  val fBodyType : FunValue => Type =
+  val fBodyType : FunValue => Option[Type] =
     attr {
       case f @ FunValue(params, body) => {
         if(fullyTypedFunction(f)) body->ttype
-        else {
-          inferFunType(f).map(ft => ft.ret).getOrElse(ErrorType())
-        }
+        else inferFunType(f).map(ft => ft.ret)
       }
     }
 
@@ -80,17 +90,25 @@ object TypeChecker {
   /**
    * Determines the type for a given term.
    */
-  val ttype : Term => Type =
+  val ttype : Term => Option[Type] =
     attr {
       /* values */
-      case UnitValue() => UnitType()
-      case TrueValue() => BoolType()
-      case FalseValue() => BoolType()
-      case ErrorValue() => ErrorType()
+      case UnitValue() => Some(UnitType())
+      case TrueValue() => Some(BoolType())
+      case FalseValue() => Some(BoolType())
       case o @ ObjValue(states,state) => {
         val objErrors = o->objectErrors
         if(objErrors.isEmpty) {
-          ObjType(states.map(sSpec _), state)
+          val stateSpecsOpt =
+            mapAllOrNone(states)(sSpec(_))
+            // (states.foldLeft
+            //   (Option(Seq.empty[StateSpec]))
+            //   { (resOpt, sdef) =>
+            //     resOpt.flatMap(res => sSpec(sdef).map(res :+ _))
+            //   }
+            // )
+
+          stateSpecsOpt.map(ObjType(_, state))
         } else {
           objErrors.foreach(err => {
             val msg = err match {
@@ -102,29 +120,35 @@ object TypeChecker {
 
             message(err.refPoint.getOrElse(o), msg)
           })
-          ErrorType()
+          None
         }
       }
-      case FunValue(params,body) => 
-        FunType(params.map(_->pEffect), body->ttype)
+      case FunValue(params,body) => {
+        val paramEffectsOpt = mapAllOrNone(params)(_->pEffect)
+        paramEffectsOpt.flatMap(params => (body->ttype).map(FunType(params, _)))
+      }
 
       /* terms */
       case LetBind(_,_,body) => body->ttype
       case Sequence(l,r) => r->ttype
       case t @ MethCall(o,m) => 
         ((t->input)(o)) match { 
-          case o @ ObjType(_,_) => o.retType(m) 
-          case _ => ErrorType()
+          // TODO: error message for bad function calls?
+          case Some(o @ ObjType(_,_)) => o.retType(m) 
+          case _ => None
         }
       case t @ FunCall(name, params) =>
         ((t->input)(name)) match {
-          case FunType(_,retType) => retType
-          case _ => ErrorType()
+          // TODO: depends on whether enough params were passed, but
+          // may be beneficial to just presuppose correct type anyway
+          // to detect more errors
+          case Some(FunType(_,retType)) => Some(retType)
+          case _ => None
         }
       case t @ If(cond,thn,els) => {
-        val t1 = thn->ttype
-        val t2 = els->ttype
-        t1.join(t2)
+        val t1Opt = thn->ttype
+        val t2Opt = els->ttype
+        Type.joinOpt(t1Opt, t2Opt)
       }
     }
 
@@ -134,8 +158,12 @@ object TypeChecker {
    */
   def contextFromParams(params : Seq[ParamDef]) =
     (params.foldLeft
-      (Map.empty[String,Type])
-      ((map,param) => map + Pair(param.name,(param->pEffect).before)))
+      (emptyContext)
+      { (map,param) => 
+        val pTypeOpt = (param->pEffect).map(_.before)
+        map + (param.name -> pTypeOpt)
+      }
+    )
     
   /** determines the input context for a term */
   val input : Term => Context =
@@ -154,13 +182,11 @@ object TypeChecker {
           if(t eq cond) p->input
           else cond->output
         }
-        case p if p != null && p.isRoot => {
-          emptyContext
-        }
-        case null if t.isRoot => {
-          // the root term always has an empty context
-          emptyContext
-        }
+        // return values for methods are typed with an empty context
+        case p : MethodDef => emptyContext
+        case p if p != null && p.isRoot => emptyContext
+        // the root term always has an empty context
+        case null if t.isRoot => emptyContext
         case p => {
           println("unmatched case " + p + " --- " + t)
           emptyContext
@@ -172,7 +198,8 @@ object TypeChecker {
    * using the derived input context for a term, determines the type of
    * a particular variable in that context if it is known.
    */
-  def inputType(t : Term, varName : String) = (t->input) get varName
+  def inputType(t : Term, varName : String) : Option[Option[Type]] = 
+    (t->input) get varName
 
   /**
    * determines the output context for a term.
@@ -191,19 +218,23 @@ object TypeChecker {
     val newType = inputType(t, t.objVarName) match {
       case None => {
         message(t, "attempt to use unknown variable %s as a method call receiver".format(t.objVarName))
-        ErrorType()
+        None
       }
-      case Some(o @ ObjType(states,_)) => {
-        val nextStateSet = o.nextStateSet(t.methName)
-        nextStateSet.map(ObjType(states, _)).getOrElse {
+      case Some(None) => None // variable with no type, due to prior type error
+      case Some(Some(o @ ObjType(states,_))) => {
+        val nextStateSetOpt = o.nextStateSet(t.methName)
+        val nextTypeOpt = nextStateSetOpt.map { nextStateSet => 
+          Some(ObjType(states, nextStateSet))
+        }
+
+        nextTypeOpt.getOrElse {
           message(t, "attempt to call unavailable method %s on receiver %s of type %s".format(t.methName, t.objVarName, o))
-          ErrorType()
+          None
         }
       }
-      case Some(ErrorType()) => ErrorType()
-      case Some(x) => {
+      case Some(Some(x)) => {
         message(t, "attempt to call method on variable %s of type %s".format(t.objVarName, x))
-        ErrorType()
+        None
       }
     }
 
@@ -211,43 +242,44 @@ object TypeChecker {
   }
 
   def funCallOutput(t : FunCall) : Context = {
-    val newParamTypes = inputType(t, t.funName) match {
-      case Some(x) => x match {
-        case FunType(defParams,_) => {
+    val newParamTypes : Seq[Option[Type]] = inputType(t, t.funName) match {
+      case Some(Some(FunType(defParams,_))) => {
           val paramTypes = t.paramNames.map(param => {
-            val ty = inputType(t, param) match {
-              case Some(ty) => ty
+            val tyOpt = inputType(t, param) match {
+              case Some(None) => None
+              case Some(Some(ty)) => Some(ty)
               case None => {
                 message(t, "unknown parameter variable " + param)
-                ErrorType()
+                None
               }
             }
 
-            (param, ty)
+            (param, tyOpt)
           })
-          defParams.zip(paramTypes).map(p => {
-            val (effectType, param) = p
-            val (paramName, paramType) = param
-            if(effectType.before != paramType && paramType != ErrorType()) {
-              message(t, "parameter " + paramName 
-                + " is not of the required type for function " +
-                t.funName + ": expected " + effectType.before +
-                ", but found " + paramType)
+
+          defParams.zip(paramTypes).map { case (effectType, (paramName, paramTypeOpt)) =>
+            paramTypeOpt.map { paramType =>
+              // TODO: this does not respect subtyping or use remap
+              if(effectType.before != paramType && paramType != None) {
+                message(t, "parameter " + paramName 
+                  + " is not of the required type for function " +
+                  t.funName + ": expected " + effectType.before +
+                  ", but found " + paramType)
+              }
+              // always just produce the output type as defined on the effect
+              // as this may allow more errors to be found in the program
+              effectType.after
             }
-            // always just produce the output type as defined on the effect
-            // as this may allow more errors to be found in the program
-            effectType.after
-          })
+          }
         }
-        case ErrorType() => t.paramNames.map(_ => ErrorType())
-        case x => {
-          message(t, "attempt to treat variable %s as a function when it is of type %s".format(t.funName, x))
-          t.paramNames.map(_ => ErrorType())
-        }
+      case Some(Some(x)) => {
+        message(t, "attempt to treat variable %s as a function when it is of type %s".format(t.funName, x))
+        t.paramNames.map(_ => None)
       }
+      case Some(None) => t.paramNames.map(_ => None)
       case None => {
         message(t, "attempt to use unknown variable %s as a function".format(t.funName))
-        t.paramNames.map(_ => ErrorType())
+        t.paramNames.map(_ => None)
       }
     }
 
@@ -263,11 +295,10 @@ object TypeChecker {
               "output domains differ"
           })
         })
-        (t.whenTrue->output).mapValues(_ => ErrorType())
+        (t.whenTrue->output).mapValues(_ => None)
       }
       case Right(ctx) => ctx
     }
-
   }
 
   def check(t : Term) : Boolean = {
@@ -318,8 +349,6 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
         Pair(TRUE, Seq.empty)
       case FalseValue() =>
         Pair(FALSE, Seq.empty)
-      case ErrorValue() =>
-        Pair(ERROR, Seq.empty)
       case ObjValue(states, state) => {
         val sDocs = states map (showStateDef _)
         val objBody = nest(lsep(sDocs, space))
@@ -357,7 +386,7 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
         Pair("if" <+> condId <+> "then" <+> thnTermId <+> "else" <+> elsTermId,
           Seq(cond, thn, els))
     }
-    val termWithType = doc <+> ":" <+> TYPE(showType(t->ttype))
+    val termWithType = doc <+> ":" <+> TYPE(showTypeOpt(t->ttype))
     val tidDoc = tid <> ":"
     val (inContext, outContext) = showContexts(t->input, t->output)
 
@@ -383,23 +412,27 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
     (m.name <+> "=" <+> parens(tid <+> "," </> m.nextState))
   }
     
+  def showTypeOpt(t : Option[Type]) : Doc =
+    t match {
+      case Some(x) => showType(x)
+      case None => "BAD"
+    }
 
   def showType(t : Type) : Doc =
-  t match {
-    case UnitType() => "Unit"
-    case BoolType() => "Bool"
-    case FunType(params, ret) => {
-      val pDocs = params map showEffect
-      parens(ssep(pDocs, ",")) <+> "->" <+> showType(ret)
+    t match {
+      case UnitType() => "Unit"
+      case BoolType() => "Bool"
+      case FunType(params, ret) => {
+        val pDocs = params map showEffect
+        parens(ssep(pDocs, ",")) <+> "->" <+> showType(ret)
+      }
+      case TopType() => "Top"
+      case ObjType(states, currentStateSet) => {
+        val sDocs = states map (showStateSpec _)
+        (braces(space <> nest(fillsep(sDocs, space)) <> line) <> 
+          "@" <> showStateSet(currentStateSet))
+      }
     }
-    case TopType() => "Top"
-    case ErrorType() => "BAD"
-    case ObjType(states, currentStateSet) => {
-      val sDocs = states map (showStateSpec _)
-      (braces(space <> nest(fillsep(sDocs, space)) <> line) <> 
-        "@" <> showStateSet(currentStateSet))
-    }
-  }
 
   def showStateSet(states : Set[String]) = {
     if(states.size == 1) text(states.head)
@@ -424,9 +457,9 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
     val inChangedVars = in.filterKeys(changed)
     val outChangedVars = out.filterKeys(changed)
 
-    val valFolder : String => (Seq[Doc],Pair[String,Type]) => Seq[Doc] = 
+    val valFolder : String => (Seq[Doc],ContextEntry) => Seq[Doc] = 
       colorStr => (_ :+ showVarMapping(_, colorStr))
-    val docFolder : (String,Map[String,Type]) => Seq[Doc] =
+    val docFolder : (String,Context) => Seq[Doc] =
       (colorStr, doc) => doc.foldLeft(Seq.empty[Doc])(valFolder(colorStr))
     
     val unchangedDocs = docFolder(Console.BLACK, unchangedVars)
@@ -445,8 +478,8 @@ class FullTracePrinter(term : Terminal) extends org.kiama.output.PrettyPrinter {
     Pair(inDoc, outDoc)
   }
 
-  def showVarMapping(p : Pair[String,Type], colorStr : String) : Doc = 
-    color(colorStr)(p._1 <+> ":" <+> showType(p._2))
+  def showVarMapping(p : Pair[String,Option[Type]], colorStr : String) : Doc = 
+    color(colorStr)(p._1 <+> ":" <+> showTypeOpt(p._2))
 
   val color : String => Doc => Doc =
     (if(term.isAnsiSupported())

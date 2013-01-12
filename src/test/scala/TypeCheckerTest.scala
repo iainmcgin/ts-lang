@@ -23,7 +23,7 @@ class TypeCheckerTest extends FunSuite with ShouldMatchers {
   def checkType(t : Term, expectedType : Type) = {
     resetmessages
     TypeChecker.check(t)
-    assert(t->ttype === expectedType)
+    assert(t->ttype === Some(expectedType))
     if(messagecount > 0) {
       fail("error messages reported:\n" + messages.mkString("\n"))
     }
@@ -64,8 +64,8 @@ class TypeCheckerTest extends FunSuite with ShouldMatchers {
     val body = unitv
     val fun = funv(body, p("x", (unitt >> unitt)))
     checkType(fun, funt(unitt, unitt >> unitt))
-    assert(body->input === Map("x" -> unitt))
-    assert(body->output === Map("x" -> unitt))
+    assert(body->input === Map("x" -> Some(unitt)))
+    assert(body->output === Map("x" -> Some(unitt)))
   }
 
   test("let term") {
@@ -75,8 +75,8 @@ class TypeCheckerTest extends FunSuite with ShouldMatchers {
     checkType(let, unitt)
     assert(value->input === empty)
     assert(value->output === empty)
-    assert(body->input === Map("x" -> unitt))
-    assert(body->output === Map("x" -> unitt))
+    assert(body->input === Map("x" -> Some(unitt)))
+    assert(body->output === Map("x" -> Some(unitt)))
     assert(let->input === empty)
     assert(let->output === empty)
   }
@@ -123,8 +123,8 @@ class TypeCheckerTest extends FunSuite with ShouldMatchers {
     val let = LetBind("x", xObjStart, ift)
 
     checkType(let, topt)
-    assert(ift.whenTrue->output === Map("x" -> ObjType(xObjTypeStates, "S2")))
-    assert(ift.whenFalse->output === Map("x" -> ObjType(xObjTypeStates, "S2")))
-    assert(ift->output === Map("x" -> ObjType(xObjTypeStates, "S2")))
+    assert(ift.whenTrue->output === Map("x" -> Some(ObjType(xObjTypeStates, "S2"))))
+    assert(ift.whenFalse->output === Map("x" -> Some(ObjType(xObjTypeStates, "S2"))))
+    assert(ift->output === Map("x" -> Some(ObjType(xObjTypeStates, "S2"))))
   }
 }

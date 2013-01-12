@@ -629,5 +629,5 @@ class ConstraintSolver(t : Term) {
     def makeContextExplicit(
       ctx : PolyContext,
       substitution : TypeVar => Type) : Context =
-      ctx.mapValues(te => makeTypeExplicit(te, substitution))
+      ctx.mapValues(te => Some(makeTypeExplicit(te, substitution)))
 }

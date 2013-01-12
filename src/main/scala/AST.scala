@@ -102,10 +102,6 @@ case class ParamDef(name : String, typeInfo : Option[EffectType])
   override def toString = name + typeInfo.map(" : " + _).getOrElse("")  
 }
 
-/* special error values */
-
-case class ErrorValue() extends Value
-
 /* object validation errors */
 sealed abstract class ObjValidationError {
   val refPoint : Option[SourceElement]
@@ -134,8 +130,6 @@ sealed abstract class Type extends SourceElement {
    * Top (⊤) is a supertype of everything.
    */
   def join(other : Type) : Type = (this, other) match {
-    case (ErrorType(), _) => ErrorType()
-    case (_, ErrorType()) => ErrorType()
     case (TopType(), _) => TopType()
     case (_, TopType()) => TopType()
     case (UnitType(), UnitType()) => UnitType()
@@ -155,10 +149,28 @@ sealed abstract class Type extends SourceElement {
     case (BoolType(), BoolType()) => Some(BoolType())
     case (a @ FunType(_,_), b @ FunType(_,_)) => a.meetFun(b)
     case (a @ ObjType(_,_), b @ ObjType(_,_)) => a.meetObj(b)
-    case (ErrorType(),_) => Some(ErrorType())
-    case (_,ErrorType()) => Some(ErrorType())
     case _ => None
   }
+}
+
+object Type {
+  def joinOpt(aOpt : Option[Type], bOpt : Option[Type]) : Option[Type] =
+    aOpt.flatMap(a => bOpt.map(a join _))
+
+  def joinSeq(types : Seq[Type]) : Type =
+    types.reduce(_ join _)
+
+  def joinSeqOpt(typeOpts : Seq[Option[Type]]) : Option[Type] =
+    typeOpts.reduce(joinOpt(_, _))
+
+  def meetOpt(aOpt : Option[Type], bOpt : Option[Type]) : Option[Type] =
+    aOpt.flatMap(t1 => bOpt.flatMap(_ meet t1))
+
+  def meetSeq(types : Seq[Type]) : Option[Type] =
+    reduceSeq(types)(_ meet _)
+
+  def meetSeqOpt(typeOpts : Seq[Option[Type]]) : Option[Type] =
+    reduceSeqOpt[Type,Type](typeOpts)((_ : Type) meet (_ : Type))
 }
 
 case class TopType() extends Type {
@@ -209,8 +221,6 @@ case class FunType(params : Seq[EffectType], ret : Type) extends Type {
   override def toString = "(" + params.mkString(",") + ") → " + ret
 }
 
-case class ErrorType() extends Type
-
 
 /**
  * Object types, which are composed of a finite set of states with
@@ -257,19 +267,16 @@ case class ObjType(states : Seq[StateSpec], currentStateSet : Set[String]) exten
   /**
    * Determines the effective return type of the specified method if it
    * were to be called with the current state set. If one or more of the
-   * current states does not allow the specified method, ErrorType is
+   * current states does not allow the specified method, None is
    * returned.
    */
-  def retType(method : String) : Type =
-      (currentStateSet.foldLeft
-      (Option.empty[Type])
-      { (res, stateName) =>
-        val stateOpt = stateMap.get(stateName)
-        val methodRetOpt = stateOpt.flatMap(_.retType(method))
-        val methodRet = methodRetOpt.getOrElse(ErrorType())
+  def retType(method : String) : Option[Type] = {
+    val retTypeOpts = currentStateSet.map { stateName =>
+      stateMap.get(stateName).flatMap(_.retType(method))
+    }
 
-        res.map(_ join methodRet).orElse(Some(methodRet))
-      }).getOrElse(ErrorType())
+    Type.joinSeqOpt(retTypeOpts.toSeq)
+  }
 
   /**
    * Determines the successor state set of the specified method were to be
